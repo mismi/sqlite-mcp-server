@@ -1,6 +1,6 @@
 # sqlite-mcp-server
 
-[![CI](https://github.com/mismi/sqlite-mcp-server/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mismi/sqlite-mcp-server/actions/workflows/ci.yml?query=branch%3Amain) [![License: MIT](https://img.shields.io/github/license/mismi/sqlite-mcp-server)](https://github.com/mismi/sqlite-mcp-server/blob/main/LICENSE)
+[![CI](https://github.com/mismi/sqlite-mcp-server/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mismi/sqlite-mcp-server/actions/workflows/ci.yml?query=branch%3Amain) [![License: MIT](https://img.shields.io/github/license/mismi/sqlite-mcp-server)](https://github.com/mismi/sqlite-mcp-server/blob/main/LICENSE) [![unit coverage: 100% lines](https://img.shields.io/badge/unit%20coverage-100%25%20lines-brightgreen)](#coverage)
 
 An MCP server for exploring and querying a local SQLite database. It gives an LLM five tools to
 inspect and modify a `.db` file, and serves both stdio (local hosts) and Streamable HTTP.
@@ -175,6 +175,12 @@ script imports `src/` directly.
 Two reports answer two different questions. The unit suite measures the modules it imports
 in-process; the end-to-end report measures the built server while real clients drive it. Neither
 replaces the other, so CI enforces both.
+
+The coverage badge at the top restates what this section measures: *unit coverage, 100 % of lines*,
+the value `bun run coverage:unit` reports today. It is a static badge, changed by hand when that
+number moves, because no coverage service is wired into the repository; the lcov artefacts of each
+run (`coverage-unit`, `coverage-e2e`) are the authoritative numbers, and they download from the run
+page.
 
 **Unit coverage (Bun).** `bun run coverage:unit` runs `bun test --coverage
 --coverage-reporter=lcov`, which instruments, through Bun, every module the tests import, then
