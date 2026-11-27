@@ -1,6 +1,8 @@
 # Automatic version updates. Dependencies are grouped so a bump arrives as one pull request per
 # kind rather than one per package, which keeps the nine required checks meaningful: a single run
-# proves the set still works together.
+# proves the set still works together. Daily checks only change how soon a release is noticed: the
+# groups still produce one pull request per kind, capped by open-pull-requests-limit, but a new
+# version surfaces within a day and an open pull request is rebased the next day instead of next week.
 #
 # The `bun` ecosystem reads the text bun.lock and needs Bun 1.1.39 or later, which this project
 # already requires. Its groups follow the manifest: runtime packages (the MCP server, express, zod)
@@ -11,8 +13,7 @@ updates:
   - package-ecosystem: "bun"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "deps"
@@ -31,8 +32,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "ci"

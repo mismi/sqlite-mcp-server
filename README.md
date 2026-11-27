@@ -271,7 +271,7 @@ silently change what runs in CI. The release version stays on the same line as a
 
 Six `uses:` lines, four actions: `actions/checkout` and `actions/upload-artifact` twice each,
 `actions/setup-node` and `oven-sh/setup-bun` once. `.github/dependabot.yml` watches the
-`github-actions` ecosystem every Monday, grouped in one pull request; a bump rewrites the SHA **and**
+`github-actions` ecosystem daily, grouped in one pull request; a bump rewrites the SHA **and**
 the comment together, because the comment is how Dependabot knows which release a SHA stands for —
 so that `# vX.Y.Z` must stay in that exact form, and a hand-pinned action without it would be
 ignored.
