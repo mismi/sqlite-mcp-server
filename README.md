@@ -259,11 +259,18 @@ current Linux report is 60/60 lines for the entry point.
 
 `.github/workflows/ci.yml` runs on every push, on pull requests and on demand; the
 [workflow's run history](https://github.com/mismi/sqlite-mcp-server/actions/workflows/ci.yml) lists
-each run with its matrix. It has nine jobs:
-`actionlint`, which checks the workflow file itself with the pinned actionlint 1.7.12, and an
+each run with its matrix. It has ten jobs:
+`actionlint`, which checks the workflow file itself with the pinned actionlint 1.7.12; `gitleaks`,
+which scans the whole git history for secrets; and an
 eight-cell matrix of four runtimes (`node-22.16`, `node-22.18`, `node-24`, `bun`) on `ubuntu-latest`
 and `windows-latest`. Each matrix job installs with `bun install --frozen-lockfile`, builds,
 type-checks, runs the unit suite, then the smoke and the deterministic evals under its own runtime.
+
+The `gitleaks` job checks out with `fetch-depth: 0` and runs twice over: the pinned
+`gitleaks/gitleaks-action` scans the pull request's own commits and fails the job on a hit, then a
+follow-up step reuses the binary that action installed to run `gitleaks git . --log-opts=--all`, so a
+key committed long before the pull request is caught too. PR comments are turned off
+(`GITLEAKS_ENABLE_COMMENTS: "false"`), which keeps the job at `contents: read`.
 
 ### Actions are pinned by commit SHA
 
@@ -275,8 +282,8 @@ silently change what runs in CI. The release version stays on the same line as a
 - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 ```
 
-Six `uses:` lines, four actions: `actions/checkout` and `actions/upload-artifact` twice each,
-`actions/setup-node` and `oven-sh/setup-bun` once. `.github/dependabot.yml` watches the
+Eight `uses:` lines, five actions: `actions/checkout` three times, `actions/upload-artifact` twice,
+`actions/setup-node`, `oven-sh/setup-bun` and `gitleaks/gitleaks-action` once each. `.github/dependabot.yml` watches the
 `github-actions` ecosystem daily, grouped in one pull request; a bump rewrites the SHA **and**
 the comment together, because the comment is how Dependabot knows which release a SHA stands for —
 so that `# vX.Y.Z` must stay in that exact form, and a hand-pinned action without it would be
