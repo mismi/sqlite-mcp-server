@@ -135,7 +135,7 @@ jobs:
       # Two sibling artifacts: coverage-unit (Bun, lcov) and coverage-e2e (Node, lcov).
       - name: Upload end-to-end coverage
         if: runner.os == 'Linux' && matrix.runtime == 'node-24'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-e2e
           path: coverage-e2e/
@@ -143,7 +143,7 @@ jobs:
 
       - name: Upload unit coverage
         if: runner.os == 'Linux' && matrix.runtime == 'bun'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-unit
           path: coverage/lcov.info
