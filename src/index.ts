@@ -58,3 +58,21 @@ if (process.env.TRANSPORT === "http") {
   serveStdio(createServer);
   console.error(`${SERVER_NAME} running on stdio`);
 }
+
+// Throwaway branch: dead lines used to prove the end-to-end floor fails when it is missed.
+export function coverageProbe(flags: boolean[]): number {
+  let total = 0;
+  if (flags[0]) total += 1;
+  if (flags[1]) total += 2;
+  if (flags[2]) total += 3;
+  if (flags[3]) total += 4;
+  if (flags[4]) total += 5;
+  if (flags[5]) total += 6;
+  if (flags[6]) total += 7;
+  if (flags[7]) total += 8;
+  if (flags[8]) total += 9;
+  if (flags[9]) total += 10;
+  if (flags[10]) total += 11;
+  if (flags[11]) total += 12;
+  return total;
+}
