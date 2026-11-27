@@ -1,7 +1,7 @@
 name: CI
 
-# Any branch: this repository has no main branch or remote yet, so a branch filter would
-# skip the very first push. workflow_dispatch keeps a manual run possible in any case.
+# Any branch, plus pull requests, so a fork or a side branch is verified too; workflow_dispatch
+# keeps a manual run possible without pushing.
 on:
   push:
   pull_request:
@@ -15,6 +15,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Runs before the matrix: a workflow that does not parse would otherwise fail every job with a
+  # confusing error instead of one clear one. The script and the version are pinned so the check
+  # is the same binary that was run locally.
+  workflows:
+    name: actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check workflow syntax
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12
+          ./actionlint -color
+
   verify:
     name: ${{ matrix.runtime }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
