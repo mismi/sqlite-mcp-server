@@ -154,6 +154,63 @@ remap `src/`'s `.js` specifiers to the `.ts` files. Node prints
 smoke (`node scripts/smoke.ts`): it comes from `node:sqlite` and is not a failure. `bun run test` and `bun run seed` are Bun-only: the tests use `bun:test` and the seed
 script imports `src/` directly.
 
+### Coverage
+
+The unit suite never imports `src/index.ts`, so `bun test --coverage` cannot see the entry point:
+that needs the built server running in a child process, which Bun does not instrument. End-to-end
+coverage therefore uses Node's own V8 dumps, merged with `c8` (a devDependency, so the lockfile
+pins it):
+
+```bash
+rm -rf .v8cov coverage-e2e
+NODE_V8_COVERAGE="$PWD/.v8cov" node scripts/smoke.ts   # stdio + HTTP, sends a real SIGTERM to the HTTP child
+NODE_V8_COVERAGE="$PWD/.v8cov" node scripts/evals.ts   # 11 deterministic questions
+./node_modules/.bin/c8 report --temp-directory=.v8cov --reporter=text --reporter=lcov --report-dir=coverage-e2e
+bun scripts/check-e2e-coverage.ts                      # the gate; reads coverage-e2e/lcov.info
+```
+
+On Windows, set the variable with `$env:NODE_V8_COVERAGE = "$PWD/.v8cov"` and expect the HTTP child
+to be missing from the dumps: Windows kills children unconditionally, so its `SIGTERM` handler does
+not run and no dump is written. That is why the gate is Linux-only in CI.
+
+The smoke forwards `NODE_V8_COVERAGE` to the HTTP child by hand, because the SDK's
+`getDefaultEnvironment()` drops it, and `src/index.ts` closes the server and the database on
+`SIGTERM`/`SIGINT`, which is what lets the child exit normally and flush its dump.
+
+`bun scripts/check-e2e-coverage.ts` enforces per-file line floors on the three files only this run
+reaches: **90 %** for `src/index.ts`, **85 %** for `src/db.ts` and **75 %** for
+`src/tools/read.ts`. It fails when a file is absent from the report, when no report exists, or when
+uncovered lines drop one of them below its floor. The fallback in `reportDatabase` carries a `/* c8 ignore */` range (the smoke always seeds a
+database), so no line number is hard-coded and moving that function cannot invalidate the gate.
+The current report is 62/62 lines; `scripts/check-e2e-coverage.test.ts` covers the passing report,
+the absent entry point, shifted line numbers and the failing cases.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push, on pull requests and on demand. It has nine jobs:
+`actionlint`, which checks the workflow file itself with the pinned actionlint 1.7.12, and an
+eight-cell matrix of four runtimes (`node-22.16`, `node-22.18`, `node-24`, `bun`) on `ubuntu-latest`
+and `windows-latest`. Each matrix job installs with `bun install --frozen-lockfile`, builds,
+type-checks, runs the unit suite, then the smoke and the deterministic evals under its own runtime.
+
+Coverage is measured once per run rather than in all eight cells:
+
+| Step | Runs on | What it does |
+|---|---|---|
+| `Unit tests with coverage (lcov)` | Linux + Bun | `bun test --coverage --coverage-reporter=lcov`; `bunfig.toml` applies a 0.9 floor to every file |
+| `Check per-file coverage floors` | Linux + Bun | `scripts/check-coverage.ts`: 100 % for `constants.ts`, `server.ts` and `tools/write.ts`, 90 % for `db.ts` and `format.ts` |
+| `Smoke with V8 coverage` and `… evaluations …` | Linux + node-24 | replace the plain smoke and evals, with `NODE_V8_COVERAGE` pointing at `.v8cov` |
+| `End-to-end coverage report` | Linux + node-24 | `c8 report` merges the dumps into `coverage-e2e/lcov.info` |
+| `Check end-to-end coverage floor (src/index.ts)` | Linux + node-24 | `scripts/check-e2e-coverage.ts`: 90 % for `index.ts`, 85 % for `db.ts`, 75 % for `tools/read.ts` |
+
+The seven other cells run the suite once, without instrumentation. The end-to-end floor stays on
+Linux because Windows terminates child processes unconditionally, so its HTTP child never writes a
+dump.
+
+Two artefacts are published per run: `coverage-unit` (`coverage/lcov.info`, Bun instrumentation)
+and `coverage-e2e` (`coverage-e2e/lcov.info`, V8 dumps merged by c8). Both are downloadable from the
+run page, next to each other.
+
 ## Evaluations
 
 `evals/evaluation.xml` holds 11 read-only questions over the demo database, each requiring several

@@ -1,10 +1,11 @@
 /**
- * End-to-end line floor for the built entry point, read from coverage-e2e/lcov.info.
+ * End-to-end line floors for the files the unit suite cannot measure, read from
+ * coverage-e2e/lcov.info.
  *
- * The unit suite never loads src/index.ts, so only the smoke and eval runs under
- * NODE_V8_COVERAGE cover it. Its HTTP block counts on Linux alone, where the SIGTERM sent by
- * the smoke is catchable and the child exits through the shutdown handler; the CI step that
- * calls this script is therefore Linux-only.
+ * The unit suite never loads src/index.ts, and it never drives the SQL error paths or the markdown
+ * rendering the smoke and evals reach, so these floors guard the report produced by
+ * NODE_V8_COVERAGE + c8 instead. Only Linux gates on it: Windows terminates child processes
+ * unconditionally, so the HTTP child never writes a dump there.
  *
  * The startup fallback in reportDatabase carries a `c8 ignore` range, so no line number is
  * hard-coded here: reportDatabase can move without invalidating this check.
@@ -15,8 +16,15 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-export const FLOOR = 0.9;
+/** Floors sit a few lines below what the current smoke and evals reach, so they catch a real loss. */
+export const FLOORS: { file: string; lines: number }[] = [
+  { file: "src/index.ts", lines: 0.9 },
+  { file: "src/db.ts", lines: 0.85 },
+  { file: "src/tools/read.ts", lines: 0.75 }
+];
+
 export const TARGET = "src/index.ts";
+export const FLOOR = FLOORS[0].lines;
 
 export type E2eCheck = {
   file: string;
@@ -52,18 +60,18 @@ export function parseRecord(text: string, target = TARGET): Record | null {
   return found ? { covered, total, uncovered } : null;
 }
 
-export function checkE2eCoverage(lcovPath: string, floor = FLOOR): E2eCheck {
+export function checkE2eCoverage(lcovPath: string, floor = FLOOR, target = TARGET): E2eCheck {
   const failures: string[] = [];
-  const empty: E2eCheck = { file: TARGET, covered: 0, total: 0, ratio: 0, uncovered: [], failures };
+  const empty: E2eCheck = { file: target, covered: 0, total: 0, ratio: 0, uncovered: [], failures };
 
   if (!existsSync(lcovPath)) {
     failures.push(`No end-to-end report at ${lcovPath}. Run the smoke and evals with NODE_V8_COVERAGE, then c8.`);
     return empty;
   }
 
-  const record = parseRecord(readFileSync(lcovPath, "utf8"));
+  const record = parseRecord(readFileSync(lcovPath, "utf8"), target);
   if (!record) {
-    failures.push(`${TARGET} is not in ${lcovPath}: the built server was never loaded under NODE_V8_COVERAGE.`);
+    failures.push(`${target} is not in ${lcovPath}: it was never loaded under NODE_V8_COVERAGE.`);
     return empty;
   }
 
@@ -74,26 +82,28 @@ export function checkE2eCoverage(lcovPath: string, floor = FLOOR): E2eCheck {
     );
   }
 
-  return { file: TARGET, ...record, ratio, failures };
+  return { file: target, ...record, ratio, failures };
 }
 
-/** Prints the result and returns the exit code, so the CLI path is testable without exiting. */
+/** Prints one line per measured file and returns the exit code, so the CLI path is testable. */
 export function runMain(argv: string[] = process.argv.slice(2)): number {
   const path = argv[0] ?? join(import.meta.dirname, "..", "coverage-e2e", "lcov.info");
-  const result = checkE2eCoverage(path);
+  const results = FLOORS.map(({ file, lines }) => checkE2eCoverage(path, lines, file));
+  const failures = [...new Set(results.flatMap((result) => result.failures))];
 
-  if (result.total > 0) {
+  for (const result of results) {
+    if (result.total === 0) continue;
     console.log(
       `${result.file.padEnd(22)} ${String(result.covered).padStart(4)}/${result.total} = ` +
-        `${(result.ratio * 100).toFixed(2)} % (floor ${(FLOOR * 100).toFixed(0)} %)`
+        `${(result.ratio * 100).toFixed(2)} % (floor ${(FLOORS.find((entry) => entry.file === result.file)!.lines * 100).toFixed(0)} %)`
     );
   }
-  if (result.failures.length > 0) {
-    console.error(`\nEnd-to-end coverage floor not met:\n  ${result.failures.join("\n  ")}`);
+  if (failures.length > 0) {
+    console.error(`\nEnd-to-end coverage floors not met:\n  ${failures.join("\n  ")}`);
     return 1;
   }
 
-  console.log("\nEnd-to-end coverage floor met.");
+  console.log("\nEnd-to-end coverage floors met.");
   return 0;
 }
 
