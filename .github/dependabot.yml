@@ -1,0 +1,17 @@
+# Version updates for the actions the workflow uses. Grouped so a bump of checkout, setup-node,
+# setup-bun and upload-artifact arrives as one pull request instead of four, which keeps the nine
+# required checks meaningful: one run proves the whole set still works together.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
