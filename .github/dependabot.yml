@@ -1,7 +1,11 @@
-# Automatic version updates. Both ecosystems are grouped so a bump arrives as one pull request
-# rather than four, which keeps the nine required checks meaningful: one run proves the set still
-# works together. `bun` reads the text bun.lock and needs Bun 1.1.39 or later, which this project
-# already requires.
+# Automatic version updates. Dependencies are grouped so a bump arrives as one pull request per
+# kind rather than one per package, which keeps the nine required checks meaningful: a single run
+# proves the set still works together.
+#
+# The `bun` ecosystem reads the text bun.lock and needs Bun 1.1.39 or later, which this project
+# already requires. Its groups follow the manifest: runtime packages (the MCP server, express, zod)
+# and development-only ones (c8, the MCP client used by the tests, @types, typescript). A package
+# that moves between the two sections moves with its group.
 version: 2
 updates:
   - package-ecosystem: "bun"
@@ -13,7 +17,12 @@ updates:
     commit-message:
       prefix: "deps"
     groups:
-      dependencies:
+      production:
+        dependency-type: "production"
+        patterns:
+          - "*"
+      development:
+        dependency-type: "development"
         patterns:
           - "*"
 
