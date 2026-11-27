@@ -38,6 +38,20 @@ export interface Options {
   reportError?: (line: string) => void;
 }
 
+export interface Floor {
+  /** Built file c8 matches before remapping. */
+  include: string;
+  /** Percentage of lines that must be covered; c8 thresholds are not fractions. */
+  lines: number;
+}
+
+/** End-to-end floors: the entry point, then the module whose startup paths it drives. */
+export const FLOORS: Floor[] = [
+  { include: "dist/index.js", lines: 90 },
+  // Measured at 89.03 % (341/383). 87 % keeps about seven lines of slack; 88 % would keep four.
+  { include: "dist/db.js", lines: 87 }
+];
+
 export const spawnStep: Runner = (command, args, options) =>
   spawnSync(command, args, { ...options, stdio: "inherit" }) as unknown as StepOutcome;
 
@@ -101,11 +115,20 @@ export function coverageE2e(options: Options): number {
     return 0;
   }
 
-  // c8's own gate. `--include` is matched against the raw script paths, before the source map is
-  // applied, so it names the built entry point; the report still attributes the lines to src/index.ts.
-  // Thresholds are percentages, hence 90 rather than 0.9.
-  const gate = [c8, "check-coverage", "--temp-directory=.v8cov", "--include=dist/index.js", "--lines=90"];
-  return step(gate, clean) ? 0 : 1;
+  // c8's own gates, one per file so each keeps its own threshold. `--include` is matched against
+  // the raw script paths, before the source map is applied, so it names the built files; the report
+  // still attributes the lines to src/. Thresholds are percentages, hence 90 rather than 0.9.
+  for (const floor of FLOORS) {
+    const gate = [
+      c8,
+      "check-coverage",
+      "--temp-directory=.v8cov",
+      `--include=${floor.include}`,
+      `--lines=${floor.lines}`
+    ];
+    if (!step(gate, clean)) return 1;
+  }
+  return 0;
 }
 
 if (import.meta.main) {
