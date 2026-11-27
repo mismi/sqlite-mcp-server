@@ -152,7 +152,7 @@ bun run build        # type-check src/ and scripts/, then emit src/ to dist/
 bun run typecheck    # type-check src/ and scripts/ without emitting
 bun run test         # SQL-guard table tests and the offline model-runner tests
 bun run coverage:unit # unit coverage with the per-file floors (scripts/check-coverage.ts)
-bun run coverage:e2e  # smoke + evals under NODE_V8_COVERAGE, the c8 report and the end-to-end floors
+bun run coverage:e2e  # smoke + evals under NODE_V8_COVERAGE, the c8 report and the entry-point floor
 bun run smoke        # exercise every tool over stdio, then the HTTP endpoint and its refusals
 bun run evals        # replay every eval question through the tools (deterministic)
 bun run evals:model  # let a model choose the tool calls (needs EVAL_API_KEY, EVAL_MODEL)
@@ -246,9 +246,9 @@ Coverage is measured once per run rather than in all eight cells:
 | Step | Runs on | What it does |
 |---|---|---|
 | `Unit coverage and per-file floors` | Linux + Bun | `bun run coverage:unit`: Bun instrumentation, `bunfig.toml` 0.9 per file, then `scripts/check-coverage.ts` (100 % for `constants.ts`, `server.ts`, `tools/write.ts`; 90 % for `db.ts`, `format.ts`) |
-| `End-to-end coverage (smoke, evals, c8, floors)` | Linux + node-24 | `bun run coverage:e2e`: smoke and evals under `NODE_V8_COVERAGE`, `c8 report` into `coverage-e2e/lcov.info`, then `c8 check-coverage` (90 % of lines for the entry point, via `--include=dist/index.js`) |
+| `End-to-end coverage (smoke, evals, c8, floor)` | Linux + node-24 | `bun run coverage:e2e`: smoke and evals under `NODE_V8_COVERAGE`, `c8 report` into `coverage-e2e/lcov.info`, then `c8 check-coverage` (90 % of lines for the entry point, via `--include=dist/index.js`) |
 
-The six other cells run the suite once, without instrumentation. The end-to-end floors stay on
+The six other cells run the suite once, without instrumentation. The end-to-end floor stays on
 Linux because Windows terminates child processes unconditionally, so its HTTP child never writes a
 dump.
 
