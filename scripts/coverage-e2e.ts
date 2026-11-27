@@ -43,15 +43,24 @@ export interface Floor {
   include: string;
   /** Percentage of lines that must be covered; c8 thresholds are not fractions. */
   lines: number;
+  /**
+   * Percentage of branches that must be covered. V8 counts a branch per side of every ternary,
+   * `??`, `||`, `&&` and short-circuit, so a few unreachable sides stay uncovered forever; the
+   * number is set from the measured value with slack, like the line floors.
+   */
+  branches: number;
 }
 
 /** End-to-end floors: the entry point, then the modules its startup and rendering paths live in. */
 export const FLOORS: Floor[] = [
-  { include: "dist/index.js", lines: 90 },
-  // Measured at 89.03 % (341/383). 87 % keeps about seven lines of slack; 88 % would keep four.
-  { include: "dist/db.js", lines: 87 },
-  // Measured at 251/251 now that the smoke asserts the three markdown renderings; 95 % keeps 12 lines.
-  { include: "dist/tools/read.js", lines: 95 }
+  // Measured at 60/60 lines and 9/11 branches. 90 % keeps six lines of slack, 75 % one branch.
+  { include: "dist/index.js", lines: 90, branches: 75 },
+  // Measured at 362/383 lines (94.52 %) and 94/113 branches (83.19 %): the smoke now drives the
+  // pagination, view and guard paths. 90 % keeps about 17 lines, 80 % about four branches.
+  { include: "dist/db.js", lines: 90, branches: 80 },
+  // Measured at 251/251 lines and 52/54 branches (96.30 %): only an empty database and a unique
+  // index stay out of reach. 95 % keeps 12 lines and one branch.
+  { include: "dist/tools/read.js", lines: 95, branches: 95 }
 ];
 
 export const spawnStep: Runner = (command, args, options) =>
@@ -126,7 +135,8 @@ export function coverageE2e(options: Options): number {
       "check-coverage",
       "--temp-directory=.v8cov",
       `--include=${floor.include}`,
-      `--lines=${floor.lines}`
+      `--lines=${floor.lines}`,
+      `--branches=${floor.branches}`
     ];
     if (!step(gate, clean)) return 1;
   }
