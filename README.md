@@ -196,7 +196,6 @@ NODE_V8_COVERAGE="$PWD/.v8cov" node scripts/evals.ts   # 11 deterministic questi
 ./node_modules/.bin/c8 report --temp-directory=.v8cov --reporter=text --reporter=lcov --report-dir=coverage-e2e
 ./node_modules/.bin/c8 check-coverage --temp-directory=.v8cov --include=dist/index.js --lines=90  # the gates, one per file
 ./node_modules/.bin/c8 check-coverage --temp-directory=.v8cov --include=dist/db.js --lines=87
-./node_modules/.bin/c8 check-coverage --temp-directory=.v8cov --include=dist/tools/read.js --lines=95
 ```
 
 The smoke forwards `NODE_V8_COVERAGE` to its children by hand, because the SDK's
@@ -205,13 +204,12 @@ The smoke forwards `NODE_V8_COVERAGE` to its children by hand, because the SDK's
 set the variable with `$env:NODE_V8_COVERAGE = "$PWD/.v8cov"`.
 
 **The floors.** After writing the report, `bun run coverage:e2e` runs c8's own gate once per file,
-so each keeps its own threshold: `dist/index.js` at 90 %, `dist/db.js` at 87 % and
-`dist/tools/read.js` at 95 %. Thresholds are percentages, so 0.9 is written `--lines=90`. The
-includes name the built files on purpose: c8 filters its raw script paths *before* applying the
-source map, where `src/index.ts` matches nothing, and a gate that matches nothing passes silently;
-the built paths select the files, which the report still attributes to `src/`. Three files only,
-chosen because the end-to-end run measures what Bun cannot see: the built server's startup, its
-missing-database path, its shutdown, and the markdown a host gets when it asks for no format.
+so each keeps its own threshold: `dist/index.js` at 90 % and `dist/db.js` at 87 %. Thresholds are
+percentages, so 0.9 is written `--lines=90`. The includes name the built files on purpose: c8
+filters its raw script paths *before* applying the source map, where `src/index.ts` matches nothing,
+and a gate that matches nothing passes silently; the built paths select the files, which the report
+still attributes to `src/`. Two files only, chosen because the end-to-end run measures what Bun
+cannot see: the built server's startup, its missing-database path and its shutdown.
 
 **Why 90 % on the entry point.** The entry point has 60 executable lines, and on Linux all 60 are
 measured (`60/60`): the stdio path from the smoke, the missing-database startup, and the HTTP path
@@ -225,14 +223,16 @@ lines (**89.03 %**). A 90 % floor would fail today, and 88 % would leave only fo
 while a real regression, such as losing the whole missing-file branch, still does. The unit suite
 holds the same file to a 90 % floor, so this one guards what only the end-to-end run reaches.
 
-**Why 95 % on `src/tools/read.ts`.** The tool renders markdown by default, and the smoke used to
-exercise only `sqlite_query`, so the list and describe renderings and the empty-result message were
-never executed: the file sat at 198/251 lines (**78.88 %**). The smoke now asserts all three — a
-markdown `sqlite_list_tables`, a markdown `sqlite_describe_table` of `books` (foreign keys, indexes
-and DDL) and a markdown query that returns no rows — and the measurement is **251/251**. At 95 %,
-that is twelve lines of slack, while losing any one of the three assertions costs more than that.
-Branch coverage on the same file is 87.75 % (the `has_more`, `unique` and nullable ternaries keep
-untaken sides); only lines are gated, as everywhere else in this project.
+**Why `src/tools/read.ts` is measured but not gated.** The tool renders markdown by default, and
+the smoke used to exercise only `sqlite_query`, so the list and describe renderings and the
+empty-result message were never executed end to end: the file sat at 198/251 lines (**78.88 %**).
+The smoke now asserts all three — a markdown `sqlite_list_tables`, a markdown
+`sqlite_describe_table` of `books` (foreign keys, indexes and DDL) and a markdown query that returns
+no rows — so the report shows **251/251**. It still has no end-to-end floor, on purpose: `bun run
+test` already holds every module the suite imports to 0.9 per file through `bunfig.toml`, and the
+end-to-end job exists for what Bun cannot instrument. The assertions keep the markdown paths
+measured and visible in `coverage-e2e/lcov.info`, and they fail on a changed rendering; a ratio on
+top of that would only need retuning whenever the file grows.
 
 **Lines 24-27 used to be excluded.** While the smoke only ever started against a seeded database,
 the `catch` in `reportDatabase` could not run there, so those lines carried a `/* c8 ignore start */`
@@ -264,7 +264,7 @@ Coverage is measured once per run rather than in all eight cells:
 | Step | Runs on | What it does |
 |---|---|---|
 | `Unit coverage and per-file floors` | Linux + Bun | `bun run coverage:unit`: Bun instrumentation, `bunfig.toml` 0.9 per file, then `scripts/check-coverage.ts` (100 % for `constants.ts`, `server.ts`, `tools/write.ts`; 90 % for `db.ts`, `format.ts`) |
-| `End-to-end coverage (smoke, evals, c8, floors)` | Linux + node-24 | `bun run coverage:e2e`: smoke and evals under `NODE_V8_COVERAGE`, `c8 report` into `coverage-e2e/lcov.info`, then `c8 check-coverage` three times — 90 % of lines for the entry point (`dist/index.js`), 87 % for `db.ts` (`dist/db.js`), 95 % for `tools/read.ts` (`dist/tools/read.js`) |
+| `End-to-end coverage (smoke, evals, c8, floors)` | Linux + node-24 | `bun run coverage:e2e`: smoke and evals under `NODE_V8_COVERAGE`, `c8 report` into `coverage-e2e/lcov.info`, then `c8 check-coverage` twice — 90 % of lines for the entry point (`dist/index.js`) and 87 % for `db.ts` (`dist/db.js`); `tools/read.ts` is measured by the smoke but not gated |
 
 The six other cells run the suite once, without instrumentation. The end-to-end floors stay on
 Linux because Windows terminates child processes unconditionally, so its HTTP child never writes a
