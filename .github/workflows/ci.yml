@@ -128,9 +128,13 @@ jobs:
         run: ./node_modules/.bin/c8 report --temp-directory=.v8cov --reporter=text --reporter=lcov --report-dir=coverage-e2e
 
       # Windows kills the HTTP child unconditionally, so only the Linux run can gate on it.
+      # --include is matched before the source map is applied, hence dist/index.js; --per-file keeps
+      # the threshold on that one file. An empty dump directory would silently pass, so it is checked.
       - name: Check end-to-end coverage floor (src/index.ts)
         if: runner.os == 'Linux' && matrix.runtime == 'node-24'
-        run: bun scripts/check-e2e-coverage.ts
+        run: |
+          test -n "$(ls -A .v8cov 2>/dev/null)" || { echo "No V8 dumps in .v8cov"; exit 1; }
+          ./node_modules/.bin/c8 check-coverage --lines 90 --per-file --include "dist/index.js" --temp-directory=.v8cov
 
       # Two sibling artifacts: coverage-unit (Bun, lcov) and coverage-e2e (Node, lcov).
       - name: Upload end-to-end coverage
