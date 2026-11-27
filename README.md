@@ -158,9 +158,20 @@ script imports `src/` directly.
 
 ### Coverage
 
-The unit suite never imports `src/index.ts`, so `bun test --coverage` cannot see the entry point:
-that needs the built server running in a child process, which Bun does not instrument. End-to-end
-coverage therefore uses Node's own V8 dumps, merged with `c8` (a devDependency, so the lockfile
+Two reports answer two different questions. The unit suite measures the modules it imports
+in-process; the end-to-end report measures the built server while real clients drive it. Neither
+replaces the other, so CI enforces both.
+
+**Unit coverage (Bun).** `bun run coverage:unit` runs `bun test --coverage
+--coverage-reporter=lcov`, which instruments, through Bun, every module the tests import, then
+applies two layers of floors to `coverage/lcov.info`: `bunfig.toml` fails the run when any file
+drops below 0.9, and `scripts/check-coverage.ts` holds the modules the suite owns to per-file
+floors — **100 %** for `src/constants.ts`, `src/server.ts` and `src/tools/write.ts`, **90 %** for
+`src/db.ts` and `src/format.ts`.
+
+The unit suite never imports `src/index.ts`, so Bun's report cannot see the entry point: measuring
+it needs the built server running in a child process, which Bun does not instrument. **End-to-end
+coverage** therefore uses Node's own V8 dumps, merged with `c8` (a devDependency, so the lockfile
 pins it). `bun run coverage:e2e` runs the whole sequence below — CI calls exactly that — and it
 needs `node` on `PATH` (or `COVERAGE_NODE` pointing at one), because Bun writes no V8 dumps:
 
@@ -169,26 +180,42 @@ rm -rf .v8cov coverage-e2e
 NODE_V8_COVERAGE="$PWD/.v8cov" node scripts/smoke.ts   # stdio + HTTP, sends a real SIGTERM to the HTTP child
 NODE_V8_COVERAGE="$PWD/.v8cov" node scripts/evals.ts   # 11 deterministic questions
 ./node_modules/.bin/c8 report --temp-directory=.v8cov --reporter=text --reporter=lcov --report-dir=coverage-e2e
-bun scripts/check-e2e-coverage.ts                      # the gate; reads coverage-e2e/lcov.info
+./node_modules/.bin/c8 check-coverage --temp-directory=.v8cov --include=dist/index.js --lines=90  # the gate
 ```
 
-On Windows, set the variable with `$env:NODE_V8_COVERAGE = "$PWD/.v8cov"` and expect the HTTP child
-to be missing from the dumps: Windows kills children unconditionally, so its `SIGTERM` handler does
-not run and no dump is written. That is why the gate is Linux-only in CI, and why
-`bun run coverage:e2e` still writes the report on Windows but skips the floors with a notice.
-
-The smoke forwards `NODE_V8_COVERAGE` to the HTTP child by hand, because the SDK's
+The smoke forwards `NODE_V8_COVERAGE` to its children by hand, because the SDK's
 `getDefaultEnvironment()` drops it, and `src/index.ts` closes the server and the database on
-`SIGTERM`/`SIGINT`, which is what lets the child exit normally and flush its dump.
+`SIGTERM`/`SIGINT`, which is what lets the HTTP child exit normally and flush its dump. On Windows,
+set the variable with `$env:NODE_V8_COVERAGE = "$PWD/.v8cov"`.
 
-`bun scripts/check-e2e-coverage.ts` enforces per-file line floors on the three files only this run
-reaches: **95 %** for `src/index.ts`, **85 %** for `src/db.ts` and **75 %** for
-`src/tools/read.ts`. It fails when a file is absent from the report, when no report exists, or when
-uncovered lines drop one of them below its floor. The entry point has no excluded lines: the smoke
-also starts the server against a missing `SQLITE_DB_PATH`, which covers the `reportDatabase`
-fallback, and no line number appears in the check, so moving that function cannot invalidate it.
-The current report is 60/60 lines; `scripts/check-e2e-coverage.test.ts` covers the passing report,
-the absent entry point, shifted line numbers and the failing cases.
+**The floor.** After writing the report, `bun run coverage:e2e` runs c8's own gate:
+`c8 check-coverage --temp-directory=.v8cov --include=dist/index.js --lines=90`. Thresholds are
+percentages, so the 0.9 floor is written `--lines=90`. The include names the built entry point on
+purpose: c8 filters its raw script paths *before* applying the source map, where `src/index.ts`
+matches nothing, and a gate that matches nothing passes silently; `dist/index.js` selects the entry
+point, which the report still attributes to `src/index.ts`. Only the entry point is gated — every
+module the unit suite imports already has a floor above, and the end-to-end run exists to measure
+what Bun cannot: the built server's own startup and shutdown.
+
+**Why 90 % on the entry point.** The entry point has 60 executable lines, and on Linux all 60 are
+measured (`60/60`): the stdio path from the smoke, the missing-database startup, and the HTTP path
+including its `SIGTERM`/`SIGINT` shutdown. At 90 %, up to six lines can move or be temporarily
+uncovered by a refactor without failing CI, while a whole branch left unexercised still does.
+
+**Lines 24-27 used to be excluded.** While the smoke only ever started against a seeded database,
+the `catch` in `reportDatabase` could not run there, so those lines carried a `/* c8 ignore start */`
+… `/* c8 ignore stop */` range — a range c8 treats as covered, which is an assumption, not a
+measurement. The smoke now also starts the server with `SQLITE_DB_PATH` pointing at an absent file, asserts the
+`No SQLite database at …` message and a clean exit, so lines 24-27 execute and are counted; the
+markers are gone and no line number appears in the check, so moving that function cannot
+invalidate the gate.
+
+**Why the gate only runs on Linux.** Windows terminates child processes unconditionally: the HTTP
+child never receives `SIGTERM`, its handler does not run and no dump is written, so only the stdio
+children (36 of the 60 lines, i.e. 60 %) are measured, which would sit below the 90 % floor. A gate
+there would fail on missing instrumentation rather than on missing tests. Windows CI jobs skip the step, and `bun run coverage:e2e` still
+writes the report locally but skips the check with a notice; Linux is the reference platform. The
+current Linux report is 60/60 lines for the entry point.
 
 ## Continuous integration
 
@@ -202,13 +229,10 @@ Coverage is measured once per run rather than in all eight cells:
 
 | Step | Runs on | What it does |
 |---|---|---|
-| `Unit tests with coverage (lcov)` | Linux + Bun | `bun test --coverage --coverage-reporter=lcov`; `bunfig.toml` applies a 0.9 floor to every file |
-| `Check per-file coverage floors` | Linux + Bun | `scripts/check-coverage.ts`: 100 % for `constants.ts`, `server.ts` and `tools/write.ts`, 90 % for `db.ts` and `format.ts` |
-| `Smoke with V8 coverage` and `… evaluations …` | Linux + node-24 | replace the plain smoke and evals, with `NODE_V8_COVERAGE` pointing at `.v8cov` |
-| `End-to-end coverage report` | Linux + node-24 | `c8 report` merges the dumps into `coverage-e2e/lcov.info` |
-| `Check end-to-end coverage floor (src/index.ts)` | Linux + node-24 | `scripts/check-e2e-coverage.ts`: 95 % for `index.ts`, 85 % for `db.ts`, 75 % for `tools/read.ts` |
+| `Unit coverage and per-file floors` | Linux + Bun | `bun run coverage:unit`: Bun instrumentation, `bunfig.toml` 0.9 per file, then `scripts/check-coverage.ts` (100 % for `constants.ts`, `server.ts`, `tools/write.ts`; 90 % for `db.ts`, `format.ts`) |
+| `End-to-end coverage (smoke, evals, c8, floors)` | Linux + node-24 | `bun run coverage:e2e`: smoke and evals under `NODE_V8_COVERAGE`, `c8 report` into `coverage-e2e/lcov.info`, then `c8 check-coverage` (90 % of lines for the entry point, via `--include=dist/index.js`) |
 
-The seven other cells run the suite once, without instrumentation. The end-to-end floor stays on
+The six other cells run the suite once, without instrumentation. The end-to-end floors stay on
 Linux because Windows terminates child processes unconditionally, so its HTTP child never writes a
 dump.
 

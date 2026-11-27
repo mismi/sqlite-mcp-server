@@ -1,21 +1,19 @@
 /**
  * One-command reproduction of the end-to-end coverage job: run the smoke and the evals with
- * NODE_V8_COVERAGE, merge the dumps with c8, then apply the per-file floors.
+ * NODE_V8_COVERAGE, merge the dumps with c8, then check the entry point's line floor with c8's
+ * own check-coverage.
  *
  * Windows cannot measure the entry point: it terminates child processes unconditionally, so the
- * HTTP child never flushes a dump and the `src/index.ts` floor is skipped with a notice. CI runs
- * this on Linux, where every floor is enforced.
+ * HTTP child never flushes a dump and the check is skipped with a notice. CI runs this on Linux.
  *
  * Run with: bun run coverage:e2e
  */
 import { spawnSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
-import { runMain } from "./check-e2e-coverage.js";
 
 const root = join(import.meta.dirname, "..");
 const dumps = join(root, ".v8cov");
-const report = join(root, "coverage-e2e");
 const c8 = join(root, "node_modules", "c8", "bin", "c8.js");
 // V8 dumps only come from Node: under Bun the scripts would run without producing any.
 const node = process.env.COVERAGE_NODE ?? (process.versions.bun ? "node" : process.execPath);
@@ -41,9 +39,12 @@ step([c8, "report", "--temp-directory=.v8cov", "--reporter=text", "--reporter=lc
 
 if (process.platform === "win32") {
   console.log(
-    "Floors skipped on Windows: child processes are terminated unconditionally, so the report is partial. CI enforces them on Linux."
+    "Floor skipped on Windows: child processes are terminated unconditionally, so the report is partial. CI enforces it on Linux."
   );
   process.exit(0);
 }
 
-process.exit(runMain([join(report, "lcov.info")]));
+// c8's own gate. `--include` is matched against the raw script paths, before the source map is
+// applied, so it names the built entry point; the report still attributes the lines to src/index.ts.
+// Thresholds are percentages, hence 90 rather than 0.9.
+step([c8, "check-coverage", "--temp-directory=.v8cov", "--include=dist/index.js", "--lines=90"], clean);
