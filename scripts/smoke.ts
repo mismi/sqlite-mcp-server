@@ -425,6 +425,83 @@ try {
   assert.ok(text(markdownEmpty).includes("The query returned no rows"), `unexpected empty page: ${text(markdownEmpty)}`);
   assert.ok(text(markdownEmpty).includes("Columns: title."), "the empty page should name the columns");
 
+  // Pagination and its hint, in the default markdown rendering.
+  const markdownPagedList = await client.callTool({ name: "sqlite_list_tables", arguments: { limit: 1 } });
+  assert.ok(!markdownPagedList.isError, `paged list_tables failed: ${text(markdownPagedList)}`);
+  assert.ok(
+    text(markdownPagedList).includes("More results: call again with offset=1."),
+    `paged list should offer the next page: ${text(markdownPagedList)}`
+  );
+
+  const markdownPagedQuery = await client.callTool({
+    name: "sqlite_query",
+    arguments: { sql: "SELECT title FROM books ORDER BY id", limit: 1 }
+  });
+  assert.ok(!markdownPagedQuery.isError, `paged query failed: ${text(markdownPagedQuery)}`);
+  assert.ok(
+    text(markdownPagedQuery).includes("More rows: call again with offset=1."),
+    `paged query should offer the next page: ${text(markdownPagedQuery)}`
+  );
+
+  // A view has no foreign keys and no indexes, so the describe rendering skips both sections.
+  const markdownView = await client.callTool({ name: "sqlite_describe_table", arguments: { table: "sales_by_book" } });
+  assert.ok(!markdownView.isError, `describe view failed: ${text(markdownView)}`);
+  assert.ok(text(markdownView).includes("# sales_by_book (view)"), `unexpected view heading: ${text(markdownView)}`);
+  assert.ok(!text(markdownView).includes("**Foreign keys:**"), "a view should not claim foreign keys");
+  assert.ok(!text(markdownView).includes("**Indexes:**"), "a view should not claim indexes");
+
+  // SQL scanning: a literal that escapes its quote, and a leading block comment.
+  const escapedLiteral = await client.callTool({
+    name: "sqlite_query",
+    arguments: { sql: "SELECT 'it''s;' AS v -- trailing note" }
+  });
+  assert.ok(!escapedLiteral.isError, `escaped literal failed: ${text(escapedLiteral)}`);
+  assert.ok(text(escapedLiteral).includes("it's;"), `unexpected literal value: ${text(escapedLiteral)}`);
+
+  // Every guard the model can hit: each has its own message, and each is reachable over MCP.
+  const insertThroughRead = await client.callTool({
+    name: "sqlite_query",
+    arguments: { sql: "INSERT INTO authors (name, country, born) VALUES ('Smoke', 'FR', 1970)" }
+  });
+  assert.equal(insertThroughRead.isError, true, "sqlite_query should refuse INSERT");
+  assert.ok(text(insertThroughRead).includes('starts with "INSERT"'), `unexpected refusal: ${text(insertThroughRead)}`);
+
+  const pragmaThroughWrite = await client.callTool({ name: "sqlite_execute", arguments: { sql: "PRAGMA foreign_keys" } });
+  assert.equal(pragmaThroughWrite.isError, true, "sqlite_execute should refuse PRAGMA");
+  assert.ok(text(pragmaThroughWrite).includes("does not run \"PRAGMA\""), `unexpected refusal: ${text(pragmaThroughWrite)}`);
+
+  const noKeyword = await client.callTool({ name: "sqlite_query", arguments: { sql: "(((" } });
+  assert.equal(noKeyword.isError, true, "a statement without a keyword should be refused");
+
+  const emptyValues = await client.callTool({ name: "sqlite_insert_row", arguments: { table: "books", values: {} } });
+  assert.equal(emptyValues.isError, true, "insert_row should refuse empty values");
+  assert.ok(text(emptyValues).includes("at least one column"), `unexpected refusal: ${text(emptyValues)}`);
+
+  const unknownTable = await client.callTool({ name: "sqlite_describe_table", arguments: { table: "missing_table" } });
+  assert.equal(unknownTable.isError, true, "describe_table should refuse an unknown table");
+  assert.ok(text(unknownTable).includes("Available objects"), `error should list the objects: ${text(unknownTable)}`);
+
+  const unknownColumn = await client.callTool({ name: "sqlite_query", arguments: { sql: "SELECT missing FROM books" } });
+  assert.equal(unknownColumn.isError, true, "an unknown column should be a tool error");
+  assert.ok(text(unknownColumn).includes("sqlite_describe_table"), `error should point at describe_table: ${text(unknownColumn)}`);
+
+  const orphan = await client.callTool({
+    name: "sqlite_insert_row",
+    arguments: { table: "books", values: { title: "Orphan", author_id: 9999, genre: "fiction", published: 2020, price: 1, stock: 1 } }
+  });
+  assert.equal(orphan.isError, true, "a foreign key violation should be a tool error");
+  assert.ok(text(orphan).includes("referenced row does not exist"), `unexpected error: ${text(orphan)}`);
+
+  // An INSERT through sqlite_execute reports the row it created; the UPDATE above reported none.
+  const sqlInsert = await client.callTool({
+    name: "sqlite_execute",
+    arguments: { sql: "INSERT INTO authors (name, country, born) VALUES ('Smoke Author', 'FR', 1970)" }
+  });
+  assert.ok(!sqlInsert.isError, `INSERT through execute failed: ${text(sqlInsert)}`);
+  const sqlInserted = sqlInsert.structuredContent as { changes: number; last_insert_rowid: number | null };
+  assert.equal(sqlInserted.changes, 1);
+  assert.ok((sqlInserted.last_insert_rowid ?? 0) > 0, `expected a rowid, got ${sqlInserted.last_insert_rowid}`);
+
   // Schema resource
   const schema = await client.readResource({ uri: "sqlite://schema" });
   const schemaText = (schema.contents[0] as { text?: string }).text ?? "";
