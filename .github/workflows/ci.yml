@@ -81,32 +81,49 @@ jobs:
 
       # The scripts spawn the built server with process.execPath, so this exercises the
       # server under the matrix runtime too: stdio, then Streamable HTTP on /mcp with the
-      # Host/Origin refusals and the loopback Origin controls.
+      # Host/Origin refusals and the loopback Origin controls. On Linux + node-24 the same two
+      # scripts run instrumented instead of plain, below, so no job executes them twice.
       - name: Smoke
+        if: runner.os != 'Linux' || matrix.runtime != 'node-24'
         run: ${{ matrix.command }} scripts/smoke.ts
 
       - name: Deterministic evaluations
+        if: runner.os != 'Linux' || matrix.runtime != 'node-24'
         run: ${{ matrix.command }} scripts/evals.ts
 
-      # End-to-end coverage: the scripts spawn the built server and Bun does not instrument child
-      # processes, so they are replayed under Node with NODE_V8_COVERAGE (a few seconds) and the
-      # dumps are merged by c8. The HTTP child now receives the variable and exits on SIGTERM, so
-      # Linux counts the whole entry point. The report stays informational (no floor): Windows
-      # terminates children unconditionally, so the number is not yet a portable gate.
-      - name: End-to-end coverage (informational, no threshold)
-        if: runner.os == 'Linux' && matrix.runtime == 'bun'
-        run: |
-          rm -rf .v8cov coverage-e2e
-          NODE_V8_COVERAGE="$PWD/.v8cov" node scripts/smoke.ts
-          NODE_V8_COVERAGE="$PWD/.v8cov" node scripts/evals.ts
-          bunx c8@10.1.3 report --temp-directory=.v8cov --reporter=text --reporter=lcov --report-dir=coverage-e2e
-          cp coverage-e2e/lcov.info coverage/e2e-lcov.info
+      # The smoke and eval scripts spawn the built server, and Bun does not instrument child
+      # processes. Here they run under Node with NODE_V8_COVERAGE in place of the plain run, so
+      # the dumps cover the entry point without a second execution. Informational (no floor):
+      # Linux counts the whole of src/index.ts, but Windows kills children unconditionally.
+      - name: Smoke with V8 coverage (Linux + node-24)
+        if: runner.os == 'Linux' && matrix.runtime == 'node-24'
+        run: node scripts/smoke.ts
+        env:
+          NODE_V8_COVERAGE: ${{ github.workspace }}/.v8cov
 
-      # One artifact, side by side: coverage/lcov.info (unit, Bun) and coverage/e2e-lcov.info.
-      - name: Upload coverage reports
+      - name: Deterministic evaluations with V8 coverage (Linux + node-24)
+        if: runner.os == 'Linux' && matrix.runtime == 'node-24'
+        run: node scripts/evals.ts
+        env:
+          NODE_V8_COVERAGE: ${{ github.workspace }}/.v8cov
+
+      - name: End-to-end coverage report (informational, no threshold)
+        if: runner.os == 'Linux' && matrix.runtime == 'node-24'
+        run: bunx c8@10.1.3 report --temp-directory=.v8cov --reporter=text --reporter=lcov --report-dir=coverage-e2e
+
+      # Two sibling artifacts: coverage-unit (Bun, lcov) and coverage-e2e (Node, lcov).
+      - name: Upload end-to-end coverage
+        if: runner.os == 'Linux' && matrix.runtime == 'node-24'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-e2e
+          path: coverage-e2e/
+          if-no-files-found: error
+
+      - name: Upload unit coverage
         if: runner.os == 'Linux' && matrix.runtime == 'bun'
         uses: actions/upload-artifact@v4
         with:
-          name: coverage
-          path: coverage/
+          name: coverage-unit
+          path: coverage/lcov.info
           if-no-files-found: error
