@@ -8,6 +8,8 @@ inspect and modify a `.db` file, and serves both stdio (local hosts) and Streama
 Built with the MCP TypeScript SDK v2 (`@modelcontextprotocol/server`) and the built-in
 `node:sqlite` module, so there are no native modules to compile.
 
+Release history: [CHANGELOG.md](CHANGELOG.md).
+
 ## Tools
 
 | Tool | What it does | Read-only |
