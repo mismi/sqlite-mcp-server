@@ -45,11 +45,13 @@ export interface Floor {
   lines: number;
 }
 
-/** End-to-end floors: the entry point, then the module its startup and error paths live in. */
+/** End-to-end floors: the entry point, then the modules its startup and rendering paths live in. */
 export const FLOORS: Floor[] = [
   { include: "dist/index.js", lines: 90 },
   // Measured at 89.03 % (341/383). 87 % keeps about seven lines of slack; 88 % would keep four.
-  { include: "dist/db.js", lines: 87 }
+  { include: "dist/db.js", lines: 87 },
+  // Measured at 251/251 now that the smoke asserts the three markdown renderings; 95 % keeps 12 lines.
+  { include: "dist/tools/read.js", lines: 95 }
 ];
 
 export const spawnStep: Runner = (command, args, options) =>
