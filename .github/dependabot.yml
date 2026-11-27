@@ -1,8 +1,24 @@
-# Version updates for the actions the workflow uses. Grouped so a bump of checkout, setup-node,
-# setup-bun and upload-artifact arrives as one pull request instead of four, which keeps the nine
-# required checks meaningful: one run proves the whole set still works together.
+# Automatic version updates. Both ecosystems are grouped so a bump arrives as one pull request
+# rather than four, which keeps the nine required checks meaningful: one run proves the set still
+# works together. `bun` reads the text bun.lock and needs Bun 1.1.39 or later, which this project
+# already requires.
 version: 2
 updates:
+  - package-ecosystem: "bun"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+
+  # The workflow pins actions by commit SHA with the version in a comment, which Dependabot reads
+  # and rewrites together.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
