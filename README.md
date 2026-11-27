@@ -274,7 +274,9 @@ current Linux report is 60/60 lines for the entry point.
 `.github/workflows/ci.yml` runs on every push, on pull requests and on demand; the
 [workflow's run history](https://github.com/mismi/sqlite-mcp-server/actions/workflows/ci.yml) lists
 each run with its matrix. It has ten jobs:
-`actionlint`, which checks the workflow file itself with the pinned actionlint 1.7.12; `gitleaks`,
+`actionlint`, which checks the workflow file itself with actionlint 1.7.12, downloaded from the
+release tarball and accepted only if its sha256 matches the one from that release's checksum file
+(no `curl | bash` downloader in the pipeline); `gitleaks`,
 which scans the whole git history for secrets; and an
 eight-cell matrix of four runtimes (`node-22.16`, `node-22.18`, `node-24`, `bun`) on `ubuntu-latest`
 and `windows-latest`. Each matrix job installs with `bun install --frozen-lockfile`, builds,
