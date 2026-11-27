@@ -1,0 +1,23 @@
+name: Dependency review
+
+# Reads the pull request's dependency changes and fails when one of them brings in an advisory at
+# or above the chosen severity. It complements Dependabot: alerts cover known vulnerable versions,
+# this one blocks a vulnerable version from entering through a PR.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    name: dependency-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
+        with:
+          # Low-severity advisories would block routine bumps; high and critical block the merge.
+          fail-on-severity: high

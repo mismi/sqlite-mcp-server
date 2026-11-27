@@ -298,8 +298,10 @@ silently change what runs in CI. The release version stays on the same line as a
 - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 ```
 
-Eight `uses:` lines, five actions: `actions/checkout` three times, `actions/upload-artifact` twice,
-`actions/setup-node`, `oven-sh/setup-bun` and `gitleaks/gitleaks-action` once each. `.github/dependabot.yml` watches the
+Seventeen `uses:` lines across the four workflow files, eight actions: `actions/checkout` six times,
+`actions/upload-artifact` three, `github/codeql-action` three (`init`, `analyze`, `upload-sarif`),
+and `actions/setup-node`, `oven-sh/setup-bun`, `gitleaks/gitleaks-action`,
+`actions/dependency-review-action` and `ossf/scorecard-action` once each. `.github/dependabot.yml` watches the
 `github-actions` ecosystem daily, grouped in one pull request; a bump rewrites the SHA **and**
 the comment together, because the comment is how Dependabot knows which release a SHA stands for —
 so that `# vX.Y.Z` must stay in that exact form, and a hand-pinned action without it would be
@@ -319,6 +321,22 @@ dump.
 Two artefacts are published per run: `coverage-unit` (`coverage/lcov.info`, Bun instrumentation)
 and `coverage-e2e` (`coverage-e2e/lcov.info`, V8 dumps merged by c8). Both are downloadable from the
 run page, next to each other.
+
+### Security workflows
+
+Three more workflows cover what `ci.yml` does not, all pinned the same way:
+
+| File | When it runs | What it checks |
+|---|---|---|
+| `codeql.yml` | push and pull request on `main`, weekly | CodeQL static analysis of the TypeScript sources with `build-mode: none` (no build needed), uploaded as code-scanning alerts |
+| `dependency-review.yml` | every pull request | the dependency diff of the PR, failing on a `high` or `critical` advisory before a vulnerable version can be merged |
+| `scorecard.yml` | weekly, on push to `main`, and on a branch-protection change | OpenSSF Scorecard over the repository's own posture — pinned dependencies, token permissions, branch protection, review — published to code scanning and to the OpenSSF API |
+
+They are complementary rather than redundant: `gitleaks` looks for committed secrets, CodeQL for
+tainted data flows, dependency review for vulnerable versions coming in, and Scorecard for the
+repository's settings, which no code scan can see. Their job names are not part of the required
+checks: a scorecard dip is a signal, not a merge blocker, while a CodeQL error or a vulnerable
+dependency still shows as a red check on the pull request.
 
 ## Evaluations
 
