@@ -12,7 +12,7 @@ import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { Client, StreamableHTTPClientTransport, type FetchLike } from "@modelcontextprotocol/client";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
@@ -232,6 +232,57 @@ async function smokeHttp(testDb: string): Promise<void> {
   }
 }
 
+/**
+ * Starts the server against a database path that does not exist: reportDatabase must explain the
+ * problem and keep serving, so tools return that error instead of the process dying.
+ */
+async function smokeMissingDatabase(): Promise<void> {
+  const missingDb = join(mkdtempSync(join(tmpdir(), "sqlite-mcp-missing-")), "absent.db");
+  const child = spawn(process.execPath, ["dist/index.js"], {
+    env: {
+      ...getDefaultEnvironment(),
+      // Forwarded by hand for the same reason as the HTTP child: getDefaultEnvironment drops it.
+      ...(process.env.NODE_V8_COVERAGE ? { NODE_V8_COVERAGE: process.env.NODE_V8_COVERAGE } : {}),
+      SQLITE_DB_PATH: missingDb
+    },
+    stdio: ["pipe", "ignore", "pipe"]
+  });
+  let logs = "";
+  child.stderr?.setEncoding("utf8");
+  child.stderr?.on("data", (chunk: string) => {
+    logs += chunk;
+  });
+
+  const deadline = Date.now() + 10_000;
+  while (!logs.includes("No SQLite database at")) {
+    if (child.exitCode !== null || Date.now() > deadline) {
+      throw new Error(`the server never reported the missing database:\n${logs.trim()}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+
+  try {
+    assert.match(logs, /No SQLite database at .*absent\.db/, `unexpected startup message: ${logs.trim()}`);
+    assert.match(logs, /bun run seed/, "the message should name the fix");
+  } finally {
+    // Closing stdin is how a stdio host stops the server; it also lets it exit normally.
+    child.stdin?.end();
+    if (child.exitCode === null) {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 5_000);
+        child.once("exit", () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+    }
+    if (child.exitCode === null) child.kill();
+    rmSync(dirname(missingDb), { recursive: true, force: true });
+  }
+
+  assert.equal(child.exitCode, 0, `the server should exit cleanly, got ${child.exitCode}: ${logs.trim()}`);
+}
+
 try {
   await client.connect(
     new StdioClientTransport({
@@ -357,6 +408,7 @@ try {
   assert.ok(schemaText.includes("CREATE TABLE books"), "schema resource should include the DDL");
 
   await smokeHttp(testDb);
+  await smokeMissingDatabase();
 
   console.error("Smoke test passed");
 } finally {

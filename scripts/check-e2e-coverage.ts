@@ -7,8 +7,8 @@
  * NODE_V8_COVERAGE + c8 instead. Only Linux gates on it: Windows terminates child processes
  * unconditionally, so the HTTP child never writes a dump there.
  *
- * The startup fallback in reportDatabase carries a `c8 ignore` range, so no line number is
- * hard-coded here: reportDatabase can move without invalidating this check.
+ * The smoke starts the server against a missing database path, so reportDatabase's error branch is
+ * covered too and the entry point has no excluded lines at all.
  *
  * Run with: ./node_modules/.bin/c8 report --temp-directory=.v8cov --report-dir=coverage-e2e \
  *   --reporter=lcov && bun scripts/check-e2e-coverage.ts
@@ -18,7 +18,7 @@ import { join } from "node:path";
 
 /** Floors sit a few lines below what the current smoke and evals reach, so they catch a real loss. */
 export const FLOORS: { file: string; lines: number }[] = [
-  { file: "src/index.ts", lines: 0.9 },
+  { file: "src/index.ts", lines: 0.95 },
   { file: "src/db.ts", lines: 0.85 },
   { file: "src/tools/read.ts", lines: 0.75 }
 ];

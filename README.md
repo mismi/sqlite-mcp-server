@@ -182,11 +182,12 @@ The smoke forwards `NODE_V8_COVERAGE` to the HTTP child by hand, because the SDK
 `SIGTERM`/`SIGINT`, which is what lets the child exit normally and flush its dump.
 
 `bun scripts/check-e2e-coverage.ts` enforces per-file line floors on the three files only this run
-reaches: **90 %** for `src/index.ts`, **85 %** for `src/db.ts` and **75 %** for
+reaches: **95 %** for `src/index.ts`, **85 %** for `src/db.ts` and **75 %** for
 `src/tools/read.ts`. It fails when a file is absent from the report, when no report exists, or when
-uncovered lines drop one of them below its floor. The fallback in `reportDatabase` carries a `/* c8 ignore */` range (the smoke always seeds a
-database), so no line number is hard-coded and moving that function cannot invalidate the gate.
-The current report is 62/62 lines; `scripts/check-e2e-coverage.test.ts` covers the passing report,
+uncovered lines drop one of them below its floor. The entry point has no excluded lines: the smoke
+also starts the server against a missing `SQLITE_DB_PATH`, which covers the `reportDatabase`
+fallback, and no line number appears in the check, so moving that function cannot invalidate it.
+The current report is 60/60 lines; `scripts/check-e2e-coverage.test.ts` covers the passing report,
 the absent entry point, shifted line numbers and the failing cases.
 
 ## Continuous integration
@@ -205,7 +206,7 @@ Coverage is measured once per run rather than in all eight cells:
 | `Check per-file coverage floors` | Linux + Bun | `scripts/check-coverage.ts`: 100 % for `constants.ts`, `server.ts` and `tools/write.ts`, 90 % for `db.ts` and `format.ts` |
 | `Smoke with V8 coverage` and `… evaluations …` | Linux + node-24 | replace the plain smoke and evals, with `NODE_V8_COVERAGE` pointing at `.v8cov` |
 | `End-to-end coverage report` | Linux + node-24 | `c8 report` merges the dumps into `coverage-e2e/lcov.info` |
-| `Check end-to-end coverage floor (src/index.ts)` | Linux + node-24 | `scripts/check-e2e-coverage.ts`: 90 % for `index.ts`, 85 % for `db.ts`, 75 % for `tools/read.ts` |
+| `Check end-to-end coverage floor (src/index.ts)` | Linux + node-24 | `scripts/check-e2e-coverage.ts`: 95 % for `index.ts`, 85 % for `db.ts`, 75 % for `tools/read.ts` |
 
 The seven other cells run the suite once, without instrumentation. The end-to-end floor stays on
 Linux because Windows terminates child processes unconditionally, so its HTTP child never writes a
