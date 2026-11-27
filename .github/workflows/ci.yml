@@ -86,13 +86,9 @@ jobs:
 
       # Coverage runs once, on Linux + Bun: the numbers do not depend on the runtime or the
       # OS, so measuring in all eight jobs only doubles the matrix time.
-      - name: Unit tests with coverage (lcov)
+      - name: Unit coverage and per-file floors
         if: runner.os == 'Linux' && matrix.runtime == 'bun'
-        run: bun test --coverage --coverage-reporter=lcov
-
-      - name: Check per-file coverage floors
-        if: runner.os == 'Linux' && matrix.runtime == 'bun'
-        run: bun scripts/check-coverage.ts
+        run: bun run coverage:unit
 
       # The scripts spawn the built server with process.execPath, so this exercises the
       # server under the matrix runtime too: stdio, then Streamable HTTP on /mcp with the
@@ -107,32 +103,12 @@ jobs:
         run: ${{ matrix.command }} scripts/evals.ts
 
       # The smoke and eval scripts spawn the built server, and Bun does not instrument child
-      # processes. Here they run under Node with NODE_V8_COVERAGE in place of the plain run, so
-      # the dumps cover the entry point without a second execution. Informational (no floor):
-      # Linux counts the whole of src/index.ts, but Windows kills children unconditionally.
-      - name: Smoke with V8 coverage (Linux + node-24)
+      # processes, so this job re-runs them under Node with NODE_V8_COVERAGE in place of the plain
+      # run: `bun run coverage:e2e` sets the variable, merges the dumps with c8 and applies the
+      # per-file floors. Windows kills children unconditionally, hence Linux only.
+      - name: End-to-end coverage (smoke, evals, c8, floors)
         if: runner.os == 'Linux' && matrix.runtime == 'node-24'
-        run: node scripts/smoke.ts
-        env:
-          NODE_V8_COVERAGE: ${{ github.workspace }}/.v8cov
-
-      - name: Deterministic evaluations with V8 coverage (Linux + node-24)
-        if: runner.os == 'Linux' && matrix.runtime == 'node-24'
-        run: node scripts/evals.ts
-        env:
-          NODE_V8_COVERAGE: ${{ github.workspace }}/.v8cov
-
-      # c8 is a devDependency, so the lockfile pins the version used here.
-      - name: End-to-end coverage report
-        if: runner.os == 'Linux' && matrix.runtime == 'node-24'
-        run: ./node_modules/.bin/c8 report --temp-directory=.v8cov --reporter=text --reporter=lcov --report-dir=coverage-e2e
-
-      # Windows kills the HTTP child unconditionally, so only the Linux run can gate on it.
-      # The check reads the lcov report rather than c8 check-coverage, which passes silently when
-      # its --include matches nothing; scripts/check-e2e-coverage.test.ts covers each failure mode.
-      - name: Check end-to-end coverage floor (src/index.ts)
-        if: runner.os == 'Linux' && matrix.runtime == 'node-24'
-        run: bun scripts/check-e2e-coverage.ts
+        run: bun run coverage:e2e
 
       # Two sibling artifacts: coverage-unit (Bun, lcov) and coverage-e2e (Node, lcov).
       - name: Upload end-to-end coverage

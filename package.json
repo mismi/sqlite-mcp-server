@@ -13,6 +13,8 @@
     "build": "tsc -p tsconfig.check.json && tsc",
     "typecheck": "tsc -p tsconfig.check.json",
     "test": "bun test",
+    "coverage:unit": "bun test --coverage --coverage-reporter=lcov && bun scripts/check-coverage.ts",
+    "coverage:e2e": "bun scripts/coverage-e2e.ts",
     "start": "bun dist/index.js",
     "dev": "bun src/index.ts",
     "seed": "bun scripts/seed.ts",

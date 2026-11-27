@@ -86,16 +86,16 @@ export function checkE2eCoverage(lcovPath: string, floor = FLOOR, target = TARGE
 }
 
 /** Prints one line per measured file and returns the exit code, so the CLI path is testable. */
-export function runMain(argv: string[] = process.argv.slice(2)): number {
+export function runMain(argv: string[] = process.argv.slice(2), floors = FLOORS): number {
   const path = argv[0] ?? join(import.meta.dirname, "..", "coverage-e2e", "lcov.info");
-  const results = FLOORS.map(({ file, lines }) => checkE2eCoverage(path, lines, file));
+  const results = floors.map(({ file, lines }) => checkE2eCoverage(path, lines, file));
   const failures = [...new Set(results.flatMap((result) => result.failures))];
 
   for (const result of results) {
     if (result.total === 0) continue;
     console.log(
       `${result.file.padEnd(22)} ${String(result.covered).padStart(4)}/${result.total} = ` +
-        `${(result.ratio * 100).toFixed(2)} % (floor ${(FLOORS.find((entry) => entry.file === result.file)!.lines * 100).toFixed(0)} %)`
+        `${(result.ratio * 100).toFixed(2)} % (floor ${(floors.find((entry) => entry.file === result.file)!.lines * 100).toFixed(0)} %)`
     );
   }
   if (failures.length > 0) {
