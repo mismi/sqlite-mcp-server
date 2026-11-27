@@ -1,0 +1,63 @@
+<evaluation>
+  <!--
+    Evaluations for sqlite-mcp-server, run against the seeded demo database (data/demo.db).
+    Every answer is replayed through the server's own tools by scripts/evals.ts:
+    run "bun run build && bun run evals" to prove them, not just recompute them.
+    Questions are read-only and require several tool calls (list/describe/query).
+  -->
+
+  <qa_pair>
+    <question>Among all genres in the bookstore's catalog, which genre has the most titles, and how many titles does that genre have? Answer in the form "&lt;genre&gt;, &lt;count&gt;".</question>
+    <answer>fiction, 11</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Which author's books have generated the most revenue across delivered orders, and what is that revenue in US dollars rounded to two decimals? Answer in the form "&lt;author name&gt;, &lt;revenue&gt;".</question>
+    <answer>Chimamanda Ngozi Adichie, 175.45</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Which single book has sold the most copies through delivered orders, and how many copies were sold? Answer in the form "&lt;title&gt;, &lt;copies&gt;".</question>
+    <answer>Americanah, 7</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>How many customers joined the bookstore before January 1, 2024? Answer with just the number.</question>
+    <answer>5</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>What is the combined value of all orders that are still pending, rounded to two decimals? Answer with just the amount, e.g. 123.45.</question>
+    <answer>55.99</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Which book has the fewest copies left in stock, and how many copies remain? Answer in the form "&lt;title&gt;, &lt;stock&gt;".</question>
+    <answer>The Baron in the Trees, 3</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Which customer living in Lagos has bought the most books through delivered orders, and how many copies did they buy? Answer in the form "&lt;customer name&gt;, &lt;copies&gt;".</question>
+    <answer>Amara Okafor, 4</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Which authors have at least one book whose copies have never been sold through a delivered order? List their names in alphabetical order, comma-separated.</question>
+    <answer>Haruki Murakami, Italo Calvino, Toni Morrison</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>What is the average price of the books published before 1980, rounded to two decimals? Answer with just the amount, e.g. 12.34.</question>
+    <answer>11.56</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Which genre brought in the most revenue from delivered orders, and what was that revenue rounded to two decimals? Answer in the form "&lt;genre&gt;, &lt;revenue&gt;".</question>
+    <answer>fiction, 293.95</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>If every book title is listed in alphabetical order and the results are read two at a time, which two titles come third and fourth? Answer in the form "&lt;third&gt;, &lt;fourth&gt;".</question>
+    <answer>After Dark, Americanah</answer>
+  </qa_pair>
+</evaluation>

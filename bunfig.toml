@@ -1,0 +1,5 @@
+[test]
+# Bun applies this to every file separately, not to an average. The suite currently sits at
+# 100 % lines and functions, so this tolerates one regression in a small file but not two.
+# Stricter per-file floors live in scripts/check-coverage.ts, which reads coverage/lcov.info.
+coverageThreshold = 0.9

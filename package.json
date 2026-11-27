@@ -1,0 +1,40 @@
+{
+  "name": "sqlite-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for exploring and querying a local SQLite database",
+  "type": "module",
+  "bin": {
+    "sqlite-mcp-server": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.check.json && tsc",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "test": "bun test",
+    "start": "bun dist/index.js",
+    "dev": "bun src/index.ts",
+    "seed": "bun scripts/seed.ts",
+    "smoke": "bun scripts/smoke.ts",
+    "evals": "bun scripts/evals.ts",
+    "evals:model": "bun scripts/evals-model.ts"
+  },
+  "engines": {
+    "node": ">=22.16"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/express": "^2.0.2",
+    "@modelcontextprotocol/node": "^2.1.2",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "express": "^5.3.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.4.0",
+    "@types/bun": "^1.4.5",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.11",
+    "typescript": "^7.0.2"
+  }
+}
