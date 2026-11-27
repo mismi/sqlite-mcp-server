@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Runs before the matrix: a workflow that does not parse would otherwise fail every job with a
-  # confusing error instead of one clear one. The script and the version are pinned so the check
+  # Runs alongside the matrix as a fast gate: expression, action and shell mistakes are reported
+  # in seconds instead of as eight failures. The script and the version are pinned so the check
   # is the same binary that was run locally.
   workflows:
     name: actionlint
