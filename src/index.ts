@@ -20,11 +20,13 @@ function reportDatabase(): void {
     console.error(
       `${SERVER_NAME}: using ${path} (${objects.length} table(s)/view(s): ${objects.map((object) => object.name).join(", ")})`
     );
+    /* c8 ignore start -- the smoke always seeds a database, so this fallback cannot run there */
   } catch (error) {
     console.error(
       `${SERVER_NAME}: ${error instanceof Error ? error.message : String(error)} Tools will return this error until the database exists.`
     );
   }
+  /* c8 ignore stop */
 }
 
 reportDatabase();
