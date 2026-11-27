@@ -68,8 +68,8 @@ test("a fully covered report passes", () => {
 });
 
 test("the floor is inclusive", () => {
-  // 54 of 60 lines is exactly 90 %.
-  const result = checkE2eCoverage(write("exact.info", report([{ file: TARGET, lines: mixed(60, 54) }])));
+  // 57 of 60 lines is exactly 95 %.
+  const result = checkE2eCoverage(write("exact.info", report([{ file: TARGET, lines: mixed(60, 57) }])));
 
   expect(result.failures).toEqual([]);
 });
@@ -81,7 +81,7 @@ test("uncovered lines below the floor fail and are listed", () => {
   expect(result.uncovered).toEqual([51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62]);
   expect(result.failures).toHaveLength(1);
   expect(result.failures[0]).toContain("uncovered line(s): 51, 52");
-  expect(result.failures[0]).toContain("< 90 %");
+  expect(result.failures[0]).toContain("< 95 %");
 });
 
 test("a report without the entry point fails instead of passing silently", () => {
@@ -118,7 +118,7 @@ test("an empty record is treated as no coverage", () => {
 test("each file is held to its own floor", () => {
   // 78.88 % for read.ts is fine at 75 %, while the same ratio would fail db.ts at 85 %.
   expect(FLOORS).toEqual([
-    { file: "src/index.ts", lines: 0.9 },
+    { file: "src/index.ts", lines: 0.95 },
     { file: "src/db.ts", lines: 0.85 },
     { file: "src/tools/read.ts", lines: 0.75 }
   ]);
