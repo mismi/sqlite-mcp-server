@@ -137,6 +137,8 @@ bun run dev          # run src/index.ts directly
 bun run build        # type-check src/ and scripts/, then emit src/ to dist/
 bun run typecheck    # type-check src/ and scripts/ without emitting
 bun run test         # SQL-guard table tests and the offline model-runner tests
+bun run coverage:unit # unit coverage with the per-file floors (scripts/check-coverage.ts)
+bun run coverage:e2e  # smoke + evals under NODE_V8_COVERAGE, the c8 report and the end-to-end floors
 bun run smoke        # exercise every tool over stdio, then the HTTP endpoint and its refusals
 bun run evals        # replay every eval question through the tools (deterministic)
 bun run evals:model  # let a model choose the tool calls (needs EVAL_API_KEY, EVAL_MODEL)
@@ -159,7 +161,8 @@ script imports `src/` directly.
 The unit suite never imports `src/index.ts`, so `bun test --coverage` cannot see the entry point:
 that needs the built server running in a child process, which Bun does not instrument. End-to-end
 coverage therefore uses Node's own V8 dumps, merged with `c8` (a devDependency, so the lockfile
-pins it):
+pins it). `bun run coverage:e2e` runs the whole sequence below — CI calls exactly that — and it
+needs `node` on `PATH` (or `COVERAGE_NODE` pointing at one), because Bun writes no V8 dumps:
 
 ```bash
 rm -rf .v8cov coverage-e2e
@@ -171,7 +174,8 @@ bun scripts/check-e2e-coverage.ts                      # the gate; reads coverag
 
 On Windows, set the variable with `$env:NODE_V8_COVERAGE = "$PWD/.v8cov"` and expect the HTTP child
 to be missing from the dumps: Windows kills children unconditionally, so its `SIGTERM` handler does
-not run and no dump is written. That is why the gate is Linux-only in CI.
+not run and no dump is written. That is why the gate is Linux-only in CI, and why
+`bun run coverage:e2e` still writes the report on Windows but skips the floors with a notice.
 
 The smoke forwards `NODE_V8_COVERAGE` to the HTTP child by hand, because the SDK's
 `getDefaultEnvironment()` drops it, and `src/index.ts` closes the server and the database on
