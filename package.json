@@ -1,6 +1,11 @@
 {
   "name": "sqlite-mcp-server",
   "version": "1.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mismi/sqlite-mcp-server.git"
+  },
   "description": "MCP server for exploring and querying a local SQLite database",
   "type": "module",
   "bin": {

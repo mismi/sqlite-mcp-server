@@ -1,5 +1,7 @@
 # sqlite-mcp-server
 
+[![CI](https://github.com/mismi/sqlite-mcp-server/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mismi/sqlite-mcp-server/actions/workflows/ci.yml?query=branch%3Amain) [![License: MIT](https://img.shields.io/github/license/mismi/sqlite-mcp-server)](https://github.com/mismi/sqlite-mcp-server/blob/main/LICENSE)
+
 An MCP server for exploring and querying a local SQLite database. It gives an LLM five tools to
 inspect and modify a `.db` file, and serves both stdio (local hosts) and Streamable HTTP.
 
@@ -130,6 +132,18 @@ so the path is covered without a manual run. The handler authenticates nothing: 
 - Table and column names are validated against the live schema before being quoted as identifiers.
 - Every tool opens the same lazily-created connection; `PRAGMA foreign_keys = ON` is set at open.
 
+## Security
+
+The server binds `127.0.0.1` and authenticates nothing: put a reverse proxy with authentication in
+front of `/mcp` before exposing it anywhere else. SQL is guarded rather than trusted (single
+read-only statement for `sqlite_query`, validated identifiers, `PRAGMA`/`ATTACH` refused), and no
+credential is needed to run the server — the optional model evaluations read `EVAL_API_KEY` from the
+environment only.
+
+Report a vulnerability privately through GitHub's Security Advisories; [SECURITY.md](SECURITY.md)
+describes what is in scope and what is accepted by design. Secret scanning and push protection are
+enabled on the repository, and it holds no environment files.
+
 ## Development
 
 ```bash
@@ -219,7 +233,9 @@ current Linux report is 60/60 lines for the entry point.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every push, on pull requests and on demand. It has nine jobs:
+`.github/workflows/ci.yml` runs on every push, on pull requests and on demand; the
+[workflow's run history](https://github.com/mismi/sqlite-mcp-server/actions/workflows/ci.yml) lists
+each run with its matrix. It has nine jobs:
 `actionlint`, which checks the workflow file itself with the pinned actionlint 1.7.12, and an
 eight-cell matrix of four runtimes (`node-22.16`, `node-22.18`, `node-24`, `bun`) on `ubuntu-latest`
 and `windows-latest`. Each matrix job installs with `bun install --frozen-lockfile`, builds,
