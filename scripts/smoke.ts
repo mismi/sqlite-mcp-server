@@ -402,6 +402,29 @@ try {
   const invalidArgs = await client.callTool({ name: "sqlite_query", arguments: { sql: "" } });
   assert.equal(invalidArgs.isError, true, "empty SQL should be rejected by the schema");
 
+  // Markdown is the default format, so these are the paths a host gets when it passes no format.
+  const markdownTables = await client.callTool({ name: "sqlite_list_tables", arguments: {} });
+  assert.ok(!markdownTables.isError, `markdown list_tables failed: ${text(markdownTables)}`);
+  assert.match(text(markdownTables), /# Objects in .+/, "markdown list should have a heading");
+  assert.match(text(markdownTables), /- \*\*books\*\* — table, \d+ row\(s\), \d+ column\(s\)/);
+  assert.match(text(markdownTables), /Showing \d+ of \d+, starting at offset 0\./);
+  assert.equal(markdownTables.structuredContent, undefined, "markdown mode should omit structured content");
+
+  const markdownDescribe = await client.callTool({ name: "sqlite_describe_table", arguments: { table: "books" } });
+  assert.ok(!markdownDescribe.isError, `markdown describe_table failed: ${text(markdownDescribe)}`);
+  for (const expected of ["# books (table)", "**Foreign keys:**", "**Indexes:**", "## DDL", "CREATE TABLE books"]) {
+    assert.ok(text(markdownDescribe).includes(expected), `markdown describe should contain ${expected}`);
+  }
+
+  // A markdown query with no rows takes the empty-page branch, which has its own message.
+  const markdownEmpty = await client.callTool({
+    name: "sqlite_query",
+    arguments: { sql: "SELECT title FROM books WHERE author_id = $author_id", params: { author_id: 999 } }
+  });
+  assert.ok(!markdownEmpty.isError, `markdown empty query failed: ${text(markdownEmpty)}`);
+  assert.ok(text(markdownEmpty).includes("The query returned no rows"), `unexpected empty page: ${text(markdownEmpty)}`);
+  assert.ok(text(markdownEmpty).includes("Columns: title."), "the empty page should name the columns");
+
   // Schema resource
   const schema = await client.readResource({ uri: "sqlite://schema" });
   const schemaText = (schema.contents[0] as { text?: string }).text ?? "";

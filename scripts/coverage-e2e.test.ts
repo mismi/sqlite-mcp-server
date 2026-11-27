@@ -64,14 +64,17 @@ describe("coverageE2e", () => {
     const code = coverageE2e({ root, node: "node", platform: "linux", run, ...output });
 
     expect(code).toBe(0);
-    expect(calls).toHaveLength(5);
-    const [entryGate, dbGate] = [calls[3]!.args, calls[4]!.args];
+    expect(calls).toHaveLength(6);
+    const [entryGate, dbGate, readGate] = [calls[3]!.args, calls[4]!.args, calls[5]!.args];
     expect(entryGate).toContain("check-coverage");
     expect(entryGate).toContain("--include=dist/index.js");
     expect(entryGate).toContain("--lines=90");
     expect(dbGate).toContain("check-coverage");
     expect(dbGate).toContain("--include=dist/db.js");
     expect(dbGate).toContain("--lines=87");
+    expect(readGate).toContain("check-coverage");
+    expect(readGate).toContain("--include=dist/tools/read.js");
+    expect(readGate).toContain("--lines=95");
     expect(output.lines).toEqual([]);
   });
 
@@ -99,6 +102,18 @@ describe("coverageE2e", () => {
     expect(code).toBe(1);
     expect(calls).toHaveLength(5);
     expect(output.lines.join("\n")).toContain("--include=dist/db.js");
+  });
+
+  test("returns 1 when only the read.ts floor is missed", () => {
+    const root = workspace();
+    const { calls, run } = harness((args) => ({ status: args.includes("--include=dist/tools/read.js") ? 1 : 0 }));
+    const output = collect();
+
+    const code = coverageE2e({ root, node: "node", platform: "linux", run, ...output });
+
+    expect(code).toBe(1);
+    expect(calls).toHaveLength(6);
+    expect(output.lines.join("\n")).toContain("--include=dist/tools/read.js");
   });
 
   test("stops once the smoke fails", () => {
