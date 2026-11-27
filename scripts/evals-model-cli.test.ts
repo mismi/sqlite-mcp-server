@@ -51,7 +51,8 @@ test("the CLI refuses to run without EVAL_MODEL or EVAL_API_KEY", async () => {
     expect(result.stderr).not.toContain("aborted");
     expect(result.stdout).toBe("");
   }
-});
+  // Three child processes on a cold Windows runner; Bun's 5 s default was tight enough to time out.
+}, 20_000);
 
 test("the CLI refuses any EVAL_ONLY that names no question", async () => {
   // Above the last question, below the first one, fractional, and not a number at all.
@@ -73,7 +74,7 @@ test("the CLI refuses any EVAL_ONLY that names no question", async () => {
     expect(result.stderr).not.toContain("aborted");
     expect(result.stdout).toBe("");
   }
-});
+}, 20_000);
 
 test("the CLI rejects a non-numeric cap instead of falling back to the default", async () => {
   const cases = [
@@ -89,4 +90,4 @@ test("the CLI rejects a non-numeric cap instead of falling back to the default",
     expect(result.stderr).not.toContain("aborted");
     expect(result.stdout).toBe("");
   }
-});
+}, 15_000);
