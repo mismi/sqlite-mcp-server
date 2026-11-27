@@ -64,25 +64,41 @@ describe("coverageE2e", () => {
     const code = coverageE2e({ root, node: "node", platform: "linux", run, ...output });
 
     expect(code).toBe(0);
-    expect(calls).toHaveLength(4);
-    const gate = calls[3]!.args;
-    expect(gate).toContain("check-coverage");
-    expect(gate).toContain("--include=dist/index.js");
-    expect(gate).toContain("--lines=90");
+    expect(calls).toHaveLength(5);
+    const [entryGate, dbGate] = [calls[3]!.args, calls[4]!.args];
+    expect(entryGate).toContain("check-coverage");
+    expect(entryGate).toContain("--include=dist/index.js");
+    expect(entryGate).toContain("--lines=90");
+    expect(dbGate).toContain("check-coverage");
+    expect(dbGate).toContain("--include=dist/db.js");
+    expect(dbGate).toContain("--lines=87");
     expect(output.lines).toEqual([]);
   });
 
-  test("returns 1 when the floor is missed", () => {
+  test("returns 1 when the entry point floor is missed", () => {
     const root = workspace();
-    const { run } = harness((args) => ({ status: args.includes("check-coverage") ? 1 : 0 }));
+    const { calls, run } = harness((args) => ({ status: args.includes("check-coverage") ? 1 : 0 }));
     const output = collect();
 
     const code = coverageE2e({ root, node: "node", platform: "linux", run, ...output });
 
     expect(code).toBe(1);
+    expect(calls).toHaveLength(4);
     const message = output.lines.join("\n");
     expect(message).toContain("check-coverage");
     expect(message).toContain("failed (1)");
+  });
+
+  test("returns 1 when only the db.ts floor is missed", () => {
+    const root = workspace();
+    const { calls, run } = harness((args) => ({ status: args.includes("--include=dist/db.js") ? 1 : 0 }));
+    const output = collect();
+
+    const code = coverageE2e({ root, node: "node", platform: "linux", run, ...output });
+
+    expect(code).toBe(1);
+    expect(calls).toHaveLength(5);
+    expect(output.lines.join("\n")).toContain("--include=dist/db.js");
   });
 
   test("stops once the smoke fails", () => {
@@ -131,8 +147,9 @@ describe("coverageE2e", () => {
     const dumps = join(root, ".v8cov");
     expect(calls[0]?.env.NODE_V8_COVERAGE).toBe(dumps);
     expect(calls[1]?.env.NODE_V8_COVERAGE).toBe(dumps);
-    expect(calls[2]?.env.NODE_V8_COVERAGE).toBeUndefined();
-    expect(calls[3]?.env.NODE_V8_COVERAGE).toBeUndefined();
+    for (const call of calls.slice(2)) {
+      expect(call.env.NODE_V8_COVERAGE).toBeUndefined();
+    }
     expect(calls[2]?.env.PATH).toBe("/usr/bin");
   });
 
