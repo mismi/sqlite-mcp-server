@@ -108,9 +108,14 @@ jobs:
           NODE_V8_COVERAGE: ${{ github.workspace }}/.v8cov
 
       # c8 is a devDependency, so the lockfile pins the version used here.
-      - name: End-to-end coverage report (informational, no threshold)
+      - name: End-to-end coverage report
         if: runner.os == 'Linux' && matrix.runtime == 'node-24'
         run: ./node_modules/.bin/c8 report --temp-directory=.v8cov --reporter=text --reporter=lcov --report-dir=coverage-e2e
+
+      # Windows kills the HTTP child unconditionally, so only the Linux run can gate on it.
+      - name: Check end-to-end coverage floor (src/index.ts)
+        if: runner.os == 'Linux' && matrix.runtime == 'node-24'
+        run: bun scripts/check-e2e-coverage.ts
 
       # Two sibling artifacts: coverage-unit (Bun, lcov) and coverage-e2e (Node, lcov).
       - name: Upload end-to-end coverage
