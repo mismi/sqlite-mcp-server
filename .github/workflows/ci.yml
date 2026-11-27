@@ -104,9 +104,9 @@ jobs:
 
       # The smoke and eval scripts spawn the built server, and Bun does not instrument child
       # processes, so this job re-runs them under Node with NODE_V8_COVERAGE in place of the plain
-      # run: `bun run coverage:e2e` sets the variable, merges the dumps with c8 and applies the
-      # per-file floors. Windows kills children unconditionally, hence Linux only.
-      - name: End-to-end coverage (smoke, evals, c8, floors)
+      # run: `bun run coverage:e2e` sets the variable, merges the dumps with c8 and checks the
+      # entry point's floor. Windows kills children unconditionally, hence Linux only.
+      - name: End-to-end coverage (smoke, evals, c8, floor)
         if: runner.os == 'Linux' && matrix.runtime == 'node-24'
         run: bun run coverage:e2e
 
