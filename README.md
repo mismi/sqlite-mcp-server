@@ -259,6 +259,23 @@ eight-cell matrix of four runtimes (`node-22.16`, `node-22.18`, `node-24`, `bun`
 and `windows-latest`. Each matrix job installs with `bun install --frozen-lockfile`, builds,
 type-checks, runs the unit suite, then the smoke and the deterministic evals under its own runtime.
 
+### Actions are pinned by commit SHA
+
+Every `uses:` names a full 40-character commit SHA rather than a tag, because a moved tag would
+silently change what runs in CI. The release version stays on the same line as a comment, in the
+`# vX.Y.Z` form:
+
+```yaml
+- uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+```
+
+Six `uses:` lines, four actions: `actions/checkout` and `actions/upload-artifact` twice each,
+`actions/setup-node` and `oven-sh/setup-bun` once. `.github/dependabot.yml` watches the
+`github-actions` ecosystem every Monday, grouped in one pull request; a bump rewrites the SHA **and**
+the comment together, because the comment is how Dependabot knows which release a SHA stands for —
+so that `# vX.Y.Z` must stay in that exact form, and a hand-pinned action without it would be
+ignored.
+
 Coverage is measured once per run rather than in all eight cells:
 
 | Step | Runs on | What it does |
