@@ -1,6 +1,10 @@
 /**
  * Per-file line-coverage floors, read from coverage/lcov.info.
  *
+ * Lines only, on purpose: Bun's lcov reporter emits no `BRDA` records at all (`grep -c '^BRDA:'
+ * coverage/lcov.info` returns 0), so a branch floor here would pass without measuring anything.
+ * Branch coverage is enforced in the end-to-end gate instead, where c8 reads V8's own counts.
+ *
  * `coverageThreshold` in bunfig.toml applies one number to every file, so it is pinned to the
  * weakest module. These floors are stricter where the code is pure or already fully covered,
  * and they name the file when it regresses instead of failing the whole suite anonymously.

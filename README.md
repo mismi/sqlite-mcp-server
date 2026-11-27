@@ -200,9 +200,9 @@ rm -rf .v8cov coverage-e2e
 NODE_V8_COVERAGE="$PWD/.v8cov" node scripts/smoke.ts   # stdio + HTTP, sends a real SIGTERM to the HTTP child
 NODE_V8_COVERAGE="$PWD/.v8cov" node scripts/evals.ts   # 11 deterministic questions
 ./node_modules/.bin/c8 report --temp-directory=.v8cov --reporter=text --reporter=lcov --report-dir=coverage-e2e
-./node_modules/.bin/c8 check-coverage --temp-directory=.v8cov --include=dist/index.js --lines=90  # the gates, one per file
-./node_modules/.bin/c8 check-coverage --temp-directory=.v8cov --include=dist/db.js --lines=87
-./node_modules/.bin/c8 check-coverage --temp-directory=.v8cov --include=dist/tools/read.js --lines=95
+./node_modules/.bin/c8 check-coverage --temp-directory=.v8cov --include=dist/index.js --lines=90 --branches=75  # the gates, one per file
+./node_modules/.bin/c8 check-coverage --temp-directory=.v8cov --include=dist/db.js --lines=90 --branches=80
+./node_modules/.bin/c8 check-coverage --temp-directory=.v8cov --include=dist/tools/read.js --lines=95 --branches=95
 ```
 
 The smoke forwards `NODE_V8_COVERAGE` to its children by hand, because the SDK's
@@ -211,8 +211,14 @@ The smoke forwards `NODE_V8_COVERAGE` to its children by hand, because the SDK's
 set the variable with `$env:NODE_V8_COVERAGE = "$PWD/.v8cov"`.
 
 **The floors.** After writing the report, `bun run coverage:e2e` runs c8's own gate once per file,
-so each keeps its own threshold: `dist/index.js` at 90 %, `dist/db.js` at 87 % and
-`dist/tools/read.js` at 95 %. Thresholds are percentages, so 0.9 is written `--lines=90`. The
+so each keeps its own thresholds: `dist/index.js` at 90 % of lines and 75 % of branches,
+`dist/db.js` at 90 % and 80 %, `dist/tools/read.js` at 95 % and 95 %. Thresholds are percentages,
+so 0.9 is written `--lines=90`. Lines alone were not enough: `src/tools/read.ts` was at 251/251
+lines while a tenth of its branches — the `has_more` hint, the `unique` marker, the `ANY` fallback
+— were never executed. **Branches are gated here and not in the unit gate** because Bun's lcov
+reporter writes no `BRDA` records at all (verify with `grep -c '^BRDA:' coverage/lcov.info`: it
+returns 0), so `scripts/check-coverage.ts` has nothing to count; c8 reads V8's own branch counts,
+which is why the end-to-end gate is the one that can enforce them. The
 includes name the built files on purpose: c8 filters its raw script paths *before* applying the
 source map, where `src/index.ts` matches nothing, and a gate that matches nothing passes silently;
 the built paths select the files, which the report still attributes to `src/`. Three files only,
@@ -224,12 +230,17 @@ measured (`60/60`): the stdio path from the smoke, the missing-database startup,
 including its `SIGTERM`/`SIGINT` shutdown. At 90 %, up to six lines can move or be temporarily
 uncovered by a refactor without failing CI, while a whole branch left unexercised still does.
 
-**Why 87 % on `src/db.ts`.** The missing-database start and the HTTP shutdown drive the module's
-startup paths, which is why it is measured end to end at all: the Linux run covers 341 of its 383
-lines (**89.03 %**). A 90 % floor would fail today, and 88 % would leave only four lines of slack;
-87 % keeps about seven — enough that a refactor touching an error path does not break the build,
-while a real regression, such as losing the whole missing-file branch, still does. The unit suite
-holds the same file to a 90 % floor, so this one guards what only the end-to-end run reaches.
+**Why 90 % on `src/db.ts`, and 80 % of its branches.** The missing-database start and the HTTP
+shutdown drive the module's startup paths, which is why it is measured end to end at all. Once the
+smoke reached the pagination, view and guard paths — paged listings and queries, a view with no
+keys, and every refusal (write through the read tool, `PRAGMA` through the write tool, an empty
+`values`, an unknown table or column, a foreign key violation) — the file moved from 341/383 lines
+(**89.03 %**) to 362/383 (**94.52 %**) and from 71.43 % to **83.19 %** of its 113 branches. The 90 %
+line floor keeps about 17 lines of slack, the 80 % branch floor about four branches. The uncovered
+remainder is structural rather than missing tests: `singleStatement` refuses an empty statement
+before it can reach its own guard, and a few `??` and `||` sides only fire on exotic schemas. The
+unit suite holds the same file to a 90 % line floor, so this gate guards what only the end-to-end
+run reaches.
 
 **Why 95 % on `src/tools/read.ts`.** The tool renders markdown by default, and the smoke used to
 exercise only `sqlite_query`, so the list and describe renderings and the empty-result message were
@@ -237,8 +248,11 @@ never executed end to end: the file sat at 198/251 lines (**78.88 %**). The smok
 three — a markdown `sqlite_list_tables`, a markdown `sqlite_describe_table` of `books` (foreign
 keys, indexes and DDL) and a markdown query that returns no rows — and the measurement is
 **251/251**. At 95 %, that is twelve lines of slack, while losing any one of the three assertions
-costs more than that. Branch coverage on the same file is 87.75 % (the `has_more`, `unique` and
-nullable ternaries keep untaken sides); only lines are gated, as everywhere else in this project.
+costs more than that. The same assertions carry the branch count: 43/49 (**87.76 %**) before, 52/54
+(**96.30 %**) once the smoke pages a listing and a query, describes a view with no foreign keys or
+indexes, and scans an escaped literal. The 95 % branch floor leaves one branch of slack; the two
+the end-to-end run cannot reach are an empty database (an object list with no entries) and a
+`UNIQUE` index, which the demo schema does not have.
 
 **Lines 24-27 used to be excluded.** While the smoke only ever started against a seeded database,
 the `catch` in `reportDatabase` could not run there, so those lines carried a `/* c8 ignore start */`
@@ -294,7 +308,7 @@ Coverage is measured once per run rather than in all eight cells:
 | Step | Runs on | What it does |
 |---|---|---|
 | `Unit coverage and per-file floors` | Linux + Bun | `bun run coverage:unit`: Bun instrumentation, `bunfig.toml` 0.9 per file, then `scripts/check-coverage.ts` (100 % for `constants.ts`, `server.ts`, `tools/write.ts`; 90 % for `db.ts`, `format.ts`) |
-| `End-to-end coverage (smoke, evals, c8, floors)` | Linux + node-24 | `bun run coverage:e2e`: smoke and evals under `NODE_V8_COVERAGE`, `c8 report` into `coverage-e2e/lcov.info`, then `c8 check-coverage` three times — 90 % of lines for the entry point (`dist/index.js`), 87 % for `db.ts` (`dist/db.js`), 95 % for `tools/read.ts` (`dist/tools/read.js`) |
+| `End-to-end coverage (smoke, evals, c8, floors)` | Linux + node-24 | `bun run coverage:e2e`: smoke and evals under `NODE_V8_COVERAGE`, `c8 report` into `coverage-e2e/lcov.info`, then `c8 check-coverage` three times — 90 % of lines and 75 % of branches for the entry point (`dist/index.js`), 90 %/80 % for `db.ts` (`dist/db.js`), 95 %/95 % for `tools/read.ts` (`dist/tools/read.js`) |
 
 The six other cells run the suite once, without instrumentation. The end-to-end floors stay on
 Linux because Windows terminates child processes unconditionally, so its HTTP child never writes a

@@ -69,12 +69,15 @@ describe("coverageE2e", () => {
     expect(entryGate).toContain("check-coverage");
     expect(entryGate).toContain("--include=dist/index.js");
     expect(entryGate).toContain("--lines=90");
+    expect(entryGate).toContain("--branches=75");
     expect(dbGate).toContain("check-coverage");
     expect(dbGate).toContain("--include=dist/db.js");
-    expect(dbGate).toContain("--lines=87");
+    expect(dbGate).toContain("--lines=90");
+    expect(dbGate).toContain("--branches=80");
     expect(readGate).toContain("check-coverage");
     expect(readGate).toContain("--include=dist/tools/read.js");
     expect(readGate).toContain("--lines=95");
+    expect(readGate).toContain("--branches=95");
     expect(output.lines).toEqual([]);
   });
 
@@ -102,6 +105,21 @@ describe("coverageE2e", () => {
     expect(code).toBe(1);
     expect(calls).toHaveLength(6);
     expect(output.lines.join("\n")).toContain("--include=dist/tools/read.js");
+  });
+
+  test("asks c8 for branches on every gate, not only lines", () => {
+    const root = workspace();
+    const { calls, run } = harness();
+    const output = collect();
+
+    coverageE2e({ root, node: "node", platform: "linux", run, ...output });
+
+    const gates = calls.filter((call) => call.args.includes("check-coverage"));
+    expect(gates).toHaveLength(3);
+    for (const gate of gates) {
+      expect(gate.args.some((arg) => arg.startsWith("--lines="))).toBe(true);
+      expect(gate.args.some((arg) => arg.startsWith("--branches="))).toBe(true);
+    }
   });
 
   test("returns 1 when only the db.ts floor is missed", () => {
