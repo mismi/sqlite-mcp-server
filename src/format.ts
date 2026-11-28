@@ -34,8 +34,11 @@ function formatCell(value: unknown): string {
 }
 
 function escapeCell(text: string): string {
-  const flattened = text.replace(/\r?\n/g, " ").replace(/\|/g, "\\|");
-  return flattened.length > 120 ? `${flattened.slice(0, 117)}...` : flattened;
+  const flattened = text.replace(/\r?\n/g, " ");
+  const shortened = flattened.length > 120 ? `${flattened.slice(0, 117)}...` : flattened;
+  // Backslashes are escaped before the pipes: a cell ending in `\` would otherwise turn the
+  // separator added below into `\|`, escaping the pipe that ends the column.
+  return shortened.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
 }
 
 /**

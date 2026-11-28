@@ -7,7 +7,7 @@
  */
 /// <reference types="bun" />
 import { expect, test } from "bun:test";
-import { serializeRow, serializeValue } from "../src/format.js";
+import { markdownTable, serializeRow, serializeValue } from "../src/format.js";
 
 test("serializeValue keeps safe integers as numbers, whatever their JavaScript type", () => {
   expect(serializeValue(42n)).toBe(42);
@@ -25,6 +25,12 @@ test("serializeValue replaces blobs with their size, and keeps null", () => {
   expect(serializeValue(new Uint8Array([1, 2, 3]))).toBe("<blob 3 bytes>");
   expect(serializeValue(null)).toBeNull();
   expect(serializeValue(undefined)).toBeNull();
+});
+
+test("markdownTable escapes a trailing backslash so it cannot swallow the cell separator", () => {
+  const table = markdownTable(["path"], [{ path: "C:\\temp\\" }]);
+
+  expect(table.split("\n")[2]).toBe("| C:\\\\temp\\\\ |");
 });
 
 test("serializeRow applies the same conversion to every column", () => {
