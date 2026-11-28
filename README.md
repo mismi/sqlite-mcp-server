@@ -10,6 +10,9 @@ Built with the MCP TypeScript SDK v2 (`@modelcontextprotocol/server`) and the bu
 
 Release history: [CHANGELOG.md](CHANGELOG.md).
 
+The npm package is `@mismi/sqlite-mcp-server`, published under the `@mismi` scope; the executable
+it installs keeps the name `sqlite-mcp-server`.
+
 ## Tools
 
 | Tool | What it does | Read-only |

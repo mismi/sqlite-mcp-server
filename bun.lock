@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "sqlite-mcp-server",
+      "name": "@mismi/sqlite-mcp-server",
       "dependencies": {
         "@modelcontextprotocol/express": "^2.0.2",
         "@modelcontextprotocol/node": "^2.1.2",

@@ -6,7 +6,10 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- The npm package is `@mismi/sqlite-mcp-server`, under the `@mismi` scope; the executable it
+  installs stays `sqlite-mcp-server`.
 
 ## [1.0.0] - 2026-11-27
 
