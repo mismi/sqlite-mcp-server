@@ -1,0 +1,67 @@
+name: Publish
+
+# Publishes the scoped package when a version tag is pushed. `--provenance` signs the tarball with
+# the workflow's OIDC identity, hence `id-token: write`. The npm token is the NPM_TOKEN secret:
+# until it exists (and the @mismi scope belongs to the account), the job stops before publishing
+# instead of producing a half-finished release. Nothing here runs on a pull request or a branch.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: npm publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4
+
+      # registry-url writes the npm auth line, so `npm publish` reads NODE_AUTH_TOKEN.
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+
+      - name: Unit tests
+        run: bun test
+
+      # A tag that disagrees with package.json would publish a version nobody asked for.
+      - name: Check the tag against the package version
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match package.json version ${version}"
+            exit 1
+          fi
+
+      # Fails before the publish step rather than skipping silently: a green run that published
+      # nothing is worse than a red one that says why.
+      - name: Refuse to publish without NPM_TOKEN
+        if: env.NODE_AUTH_TOKEN == ''
+        run: |
+          echo "::error::NPM_TOKEN is not configured, so the package cannot be published. Add it in Settings > Secrets, once the @mismi scope exists on npm."
+          exit 1
+
+      - name: Publish with provenance
+        if: env.NODE_AUTH_TOKEN != ''
+        run: npm publish --provenance --access public
